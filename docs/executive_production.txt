@@ -1,0 +1,67 @@
+YOUR TASK => SINGLE BLACK-BOX CODEX PROMPT GENERATION FOR THE FOLLOWING PROJECT DEVELOPMENT AND PRODUCTION AND ADD YOUR RECOMMENDATIONS EVERYWHERE YOU READ (YOUR TASK) BELOW:
+
+PROJECT TITLE: IBKR DATA LOADER APPLICATION DEVELOPMENT
+
+CONTEXT: Application development (named "LOAD") for extracting any existing available data through API connection to TWS and IB Gateway (prioritize development on IB Gateway for big dataset extraction). Financial data is key for the development of any quantitative finance or algorithmic trading application. Therefore, the first step of any model creation is the data source and quality. The bigger the better for data analytics. As your own generative model requires billions of tokens and data references for generating coherent and relevant text, a quantitative finance or/and trading model requires billions of time series data for generating any coherent and relevant investment strategy with learning objective to optimize risk/return trade-off and performance (beat the long broad-based stock market exposure). So, how do we approach the first step to gather enough datasets for the investment instrument (stocks, bonds, options, futures, ETFs. ETCs, ETPs, mutual funds, swaps, structured products (complete with your own research of all existing financial products offered by IBKR brokerage services (more than 150 global markets are covered by IBKR's brokerage license)). Each financial instrument is identifiable by three unique tokens: ticker/symbol, exchange/currency and ISIN. One of the unique token (ticker or ISIN) should be used as sole input for this application ("LOAD").
+
+GOAL: Single-ended application development (named "LOAD") for extracting any existing available data for any given IBKR-licensed and -covered financial instrument through API connection to TWS and IB Gateway (prioritize development on IB Gateway for big dataset extractions). Application must be callable and importable into other projects as main data loader. 
+
+SCOPE: this is a big data project and the scope is extremely large but the size is not greater than the TWS and IB Gateway finite universe. The application must load, fetch, extract any possible data available on a given financial instrument identified by three tokens and inputted as one of the two following token: ISIN or ticker. The codes must ensure that we identify every existing data point linked to the financial instrument and look at the fields of data points for the derivatives instrument linked to the financial instrument as well (e.g. for stock and ETFs, go into option_data_loader and fetch all available and existing data (e.g. option chains, option contracts open interest/volume). The scope is only the raw data (including both the historical and live data) and no computation of financial metrics is to be done in this application/package/program. Why is this? Here we look at what financial data IBKR can recover for us and make the scope within the IBKR API data coverage at the maximum capacity of any user with full subscription. For computing financial metrics and ratios, we will conceive another application/package/program dedicated to it sourcing the data from this very application of IBKR data loader. 
+
+TIME SERIES AND DATA DEFINITION: a single data point is for example the closing value of the 10min candles on the SPX quoted on Cboe on January 5th 2026 at 18:50:00 UTC. A dataset represents the time series of all closing values of the 10min candles from the opening of the market at 15:30:00 UTC to now. Now you and the Codex must understand that here we have a finite set of data points (those programmed by TWS or IB Gateway universe) and finite universe of datasets (you can do many combinations of individual parameters (line, candle, seconds, minutes, volumes,...) but the entire universe of resulting data points and datasets is finite). A dataset is thus an aggregate of data points and we can have sub-datasets within one dataset (the daily open price is the sub-dataset and the aggregate of daily open, close, low, high, volume, ... is main dataset). 
+
+API REQUEST TIME CONSTRAINT: ensure the application is able to run several hours because fetching these data points will be very time consuming and IBKR API impose limit on data extraction. The application must be build to run on several blocks meaning it should be able to submit an API request do and close it, and automatically re-run another API request for another data point.
+
+USER: any brokerage account holder with full subscription to all IBKR's data bundles.
+
+DATA SOURCE: Access to IBKR real-time and historical market and financial data depends on account's "Market data subscription" from Interactive Brokers (IBKR). Pricing and data bundle subscription availability go to: https://www.interactivebrokers.ca/en/accounts/fees/marketData.php?ib_entity=ca 
+
+SUGGESTED RESOURCES: a) for available market data subscriptions see the content of the following website: https://www.interactivebrokers.ca/en/accounts/fees/marketData.php?ib_entity=ca and allow for every market coverage for which data will be made available if fees are paid by user b) for any IBKR API explanation or other guidelines (how it works), see the document saved under IBKR_DATA_LOADER\docs\guides c) Reference for all of the TWS API classes go to:
+https://ibkrcampus.com/campus/ibkr-api-page/twsapi-ref/#acctsumtags-ref
+
+PRODUCTION FLOW:
+
+0) The project should be build as an application on Windows 11 but also with the functionality to work as a Python package to facilitate and enable the import (from...import...) as data loader and source for other quantitative and financial projects. The application must be callable from other projects directly by listing financial instruments as input. This allow for example to import this application as a package/module into another project and we would be able to call it to import vast datasets on the financial instruments of interest. 
+
+1) Establish a secure and strong API connection with TWS or Gateway (an example of a connector class is made available in /src as ibkr_api_connector_class.py. 
+
+2) Select as input any financial instrument existing in the brokerage product coverage of IBKR based on a ticker or ISIN. If it is possible to input several instruments at the same time and the application work block by block from first to last instrument (each instrument representing one working block) inputted then prioritize the development of multiple inputs. If for production-level implementation it is better to limit to one single instrument per input, then allow to select only one instrument at a time (IBKR socket client does not allow as far as my knowledge goes parallel computing and API requests).
+
+3) Screen every possible data point linked to the inputted financial instrument.
+
+4) Construct the sub-datasets and main datasets. How would it be best to handle the parameters and criteria for generating all datasets systematically and automatically (e.g. I need for another project a dataset to reconstruct the intraday 10 minutes candle of a stock executed price for 3 months; I need the daily adjusted close for 30 years; I need the bid/ask prices of a given option contract for last 2 years to calculate spreads in another project and I need the (these last two datasets are tricky because we first go through the underlying asset as financial instrument input and then go fetch the option chains and finally the option contract's saved file under respective folder "spx_option_data. We need a method to historize option data (see below "Historical Options Data Handling" for more details)? (YOUR TASK) 
+
+5) Save the datasets in the respective folders of the financial instrument and its category of dataset (stock price, fundamental financial data, option data)
+
+6) Allow to concatenate newest/latest data on existing files (e.g. i have already fetched historical daily spot prices (open, close, high, low, volume, barCount for SPX from 1860 to 2025 but today i want to complete the dataset with the available data for 2026 and concatenate with the existing file)
+
+7) Peform a data accuracy and quality control (DAQC) protocol. (YOUR TASK) Please design a DQC protocol including missing data for open trading days, NaN values, outliers and any other relevant control checkpoint for ensuring data quality and accuracy)
+
+MAIN FUNCTIONALITIES AND FEATURES:
+
+1) Live=Real-Time Data Handling: the application must ensure that we can extract live / real-time market data to build and fed portfolio risk monitoring dashboards or other applications that require to track a financial instrument latest and newest data as time passes (tick-by-tick, mark-to-market,...)
+
+2) Historical Data Handling & Extraction: review IBKR policy for data extraction. The application must be able to go get fetch data as far as possible in the past. For instance the S&P 500 Index has data going back to 1860 as shown by the works of Robert J. Shiller (see http://www.econ.yale.edu/~shiller/data.htm), and the application must be able to recreate datasets as large as this one by fetching piece by piece to prevent the API request to timeout (see IBKR's data extraction limitations. Historical data extraction will depend on many variables but the extraction must cover every possible historical data functionality (e.g. intraday 1s ticks and move 
+
+3) Historical Options Data Handling: most complex task of project which requires to save and aggregate historical dataset on options contracts which disappear after expiration. I want each day to connect to IBKR API and launch the "LOAD" application from Windows time scheduler, fetch options data including: options chains with bid/ask for all strikes and existing expirations, greeks, volumes, open interest (and the rest of data points to make the list exhaustive here); and finally drop into a .csv file the historization of these data points. For example, if i have a .csv file saved from previous friday with the data for VIX puts and calls, then on Monday I want to create a historical file with the dates 02.01.2026 and all the options data entries (several rows because options chains are tables with many strikes as rows and with bid/ask prices for puts/calls (4 price columns), bid/ask volumes for both puts/calls (4 columns) and implied volatility (1 column) and greeks (delta, gamma, vega, theta,...).
+
+4) Files should have as many columns (1 column= 1 dataset) as possible to reduce the number of files and files with the same dataset should never co-exist. 
+
+5) Respective folders should be created for each financial instrument with folder name equal to the ticker and underlying folders representing the category of data that it contains (e.g. we input SPX and VIX and the folder creates two folders one for SPX and one for VIX and with underlying folders (in this case for financial indices) the category of data such as historical_spot_daily or historical_spot_intraday)
+
+LOGIC AND INFERENCE:
+
+Financial indices will not have the same range of data as a stock which is a real company. Indices do not have financial statements for example but stocks do. Indices have constituents which stocks do not have. ETFs have management fees or expense ratios which indices and stocks do not have. And the list goes on. Codex should be able to have a strong logic throughout the development of this project to make the codes consistent and consolidated. The application should be able to pinpoint the scope of each financial instrument's data points.
+
+ERROR PREVENTING AND RESOLUTION: ensure that no timeout error or other errors appear (likely related to API request, data saving, data files reading, data concatenation, dates format,...)
+
+The entire text above can be found in /docs/executive_production.txt for the Codex to read in case as well.
+
+NOTA BENE (YOUR TASK): for generating prompt, consider the optimization rules for Codex:
+1️⃣ Force a Plan
+2️⃣ Break tasks into numbered, ordered units
+3️⃣ Use hard constraints (negative instructions)
+4️⃣ Require intermediate artifacts
+5️⃣ Make correctness verifiable
+6️⃣ Specify what to do when blocked
+7️⃣ Stop conditions

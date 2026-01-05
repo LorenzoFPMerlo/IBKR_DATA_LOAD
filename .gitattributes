@@ -1,0 +1,24 @@
+# Normalize line endings
+* text=auto
+
+# Treat notebooks and data as binary (avoid huge diffs)
+*.ipynb binary
+*.parquet binary
+*.feather binary
+*.sqlite binary
+*.db binary
+
+# LaTeX
+*.tex text diff
+*.bib text diff
+
+# Ensure consistent line endings for LaTeX
+*.tex text eol=lf
+*.bib text eol=lf
+*.sty text eol=lf
+*.cls text eol=lf
+
+# Images
+*.png binary
+*.jpg binary
+*.pdf binary

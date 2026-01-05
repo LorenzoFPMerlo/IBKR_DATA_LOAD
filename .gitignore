@@ -1,0 +1,65 @@
+# --- Python cache & builds ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Jupyter / Spyder / IDE ---
+.ipynb_checkpoints/
+.spyproject/
+.vscode/
+.idea/
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Logs & runtime artifacts ---
+*.log
+logs/
+checkpoints/
+tmp/
+*.pid
+
+# --- Data & results (avoid leaking proprietary data) ---
+*.parquet
+*.feather
+*.sqlite
+*.db
+
+# --- Credentials & secrets (NEVER commit) ---
+*.env
+.env.*
+.envrc
+secrets/
+token.json
+credentials.json
+*.key
+*.pem
+*.crt
+*.p12
+config.local.*
+private_settings.*
+
+# --- Broker/API & IBKR artifacts ---
+ibgateway/
+tws.xml
+settings.xml
+
+# --- Node or other tooling (if present) ---
+node_modules/
+
+# --- Allow env template ---
+!.env.example

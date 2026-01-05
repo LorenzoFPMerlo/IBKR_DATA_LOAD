@@ -1,0 +1,63 @@
+name: vixlab_cuda
+channels:
+  - conda-forge
+dependencies:
+  # --- Base / tooling / testing ---
+  - python=3.11
+  - pip>=24,<26
+  - setuptools
+  - pytest>=7.4,<9
+
+  # --- Core numeric stack (NumPy 1.26 to satisfy numba on Windows) ---
+  - numpy=1.26.*
+  - pandas=2.2.*
+  - scipy=1.11.*
+  - numba=0.59.*
+  - pyarrow=16.*
+  - pyyaml=6.*
+  - python-dotenv=1.*
+  - tqdm=4.*
+  - loguru=0.7.*
+
+  # --- Stats & econometrics ---
+  - statsmodels=0.14.*
+
+  # --- ML ---
+  - scikit-learn=1.4.*
+  - xgboost=2.*
+  - lightgbm=4.3.*
+
+  # --- Visualization ---
+  - matplotlib=3.8.*
+  - seaborn=0.13.*
+  - plotly=5.*
+
+  # --- IO / formats ---
+  - openpyxl=3.1.*
+
+  # --- Broker / scheduling ---
+  - ib-insync=0.9.*
+  - apscheduler=3.*
+
+  # --- LaTeX build helper (optional) ---
+  - latexmk
+
+  - pip:
+      # econometrics / volatility models (install via pip to avoid conda solve issues)
+      - arch>=7,<8
+
+      # Backtesting / analytics helpers (optional)
+      - vectorbt>=0.26,<0.30
+      - pyportfolioopt>=1.5,<2
+      - cvxpy>=1.4,<2
+      - riskfolio-lib>=6,<7
+
+      #Interactive Dashboards
+      - streamlit>=1.30
+      - plotly>=5,<6
+
+      # --- PyTorch CUDA wheels (CUDA 12.6 build) ---
+      - "--find-links https://download.pytorch.org/whl/torch/"
+      - torch==2.8.0+cu126
+      - "--find-links https://download.pytorch.org/whl/torchvision/"
+      - torchvision==0.23.0+cu126
