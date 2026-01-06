@@ -76,6 +76,10 @@ class IbkrConnector:
 
 
 def main() -> int:
+    """Connection smoke test.
+
+    Usage: python -m ibkr_data_load.connection.connector
+    """
     parser = argparse.ArgumentParser(description="Test IBKR connection and disconnect.")
     parser.add_argument("--config", default="config/defaults.yaml", help="Defaults config")
     parser.add_argument("--user-config", default="config/user.yaml", help="User config")
@@ -85,8 +89,12 @@ def main() -> int:
     connector = IbkrConnector(config=config, run_id="connection_test", logger=logger)
     with connector.connect():
         logger.info("run_id=%s connection test succeeded", connector.run_id)
+        print(
+            f"✅ Connected to IBKR at {config.connection.host}:{config.connection.port} "
+            f"(client_id={config.connection.client_id})"
+        )
+    print("✅ Disconnected from IBKR")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

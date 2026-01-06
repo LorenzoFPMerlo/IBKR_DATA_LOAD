@@ -7,12 +7,10 @@ from typing import Any
 
 import yaml
 
-
 @dataclass
 class LoggingConfig:
     level: str
     json_logs: bool
-
 
 @dataclass
 class ConnectionConfig:
@@ -23,13 +21,11 @@ class ConnectionConfig:
     max_retries: int
     retry_backoff_seconds: float
 
-
 @dataclass
 class InstrumentConfig:
     preferred_exchange: str | None
     currency: str | None
     security_types: list[str]
-
 
 @dataclass
 class HistoricalBarsConfig:
@@ -46,12 +42,40 @@ class HistoricalBarsConfig:
     format_date: int
 
 @dataclass
+class OptionsDiscoveryConfig:
+    cache_max_age_hours: int
+
+@dataclass
+class OptionsSnapshotConfig:
+    enabled: bool
+    max_contracts_per_batch: int
+    sleep_between_batches_seconds: float
+    snapshot_wait_seconds: float
+    max_expirations: int
+    strike_band_pct: float
+    strike_step: int
+    exchange: str
+
+@dataclass
+class HistoricalTicksConfig:
+    enabled: bool
+    start_date: str | None
+    end_date: str | None
+    chunk_seconds: int
+    max_ticks_per_request: int
+    min_request_interval_seconds: float
+    max_retries: int
+
+@dataclass
 class AppConfig:
     output_dir: str
     logging: LoggingConfig
     connection: ConnectionConfig
     instruments: InstrumentConfig
     historical_bars: HistoricalBarsConfig
+    options_discovery: OptionsDiscoveryConfig
+    options_snapshot: OptionsSnapshotConfig
+    historical_ticks: HistoricalTicksConfig
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -109,6 +133,9 @@ def load_config(defaults_path: Path, user_path: Path) -> AppConfig:
     conn_cfg = merged.get("connection", {})
     instruments_cfg = merged.get("instruments", {})
     historical_cfg = merged.get("historical_bars", {})
+    options_cfg = merged.get("options", {})
+    options_snapshot_cfg = options_cfg.get("snapshot", {})
+    ticks_cfg = merged.get("historical_ticks", {})
     return AppConfig(
         output_dir=merged.get("output_dir", "data"),
         logging=LoggingConfig(
@@ -147,5 +174,31 @@ def load_config(defaults_path: Path, user_path: Path) -> AppConfig:
             ),
             max_retries=int(historical_cfg.get("max_retries", 6)),
             format_date=int(historical_cfg.get("format_date", 1)),
+        ),
+        options_discovery=OptionsDiscoveryConfig(
+            cache_max_age_hours=int(options_cfg.get("discovery_cache_max_age_hours", 24)),
+        ),
+        options_snapshot=OptionsSnapshotConfig(
+            enabled=bool(options_snapshot_cfg.get("enabled", False)),
+            max_contracts_per_batch=int(options_snapshot_cfg.get("max_contracts_per_batch", 50)),
+            sleep_between_batches_seconds=float(
+                options_snapshot_cfg.get("sleep_between_batches_seconds", 2.0)
+            ),
+            snapshot_wait_seconds=float(options_snapshot_cfg.get("snapshot_wait_seconds", 2.0)),
+            max_expirations=int(options_snapshot_cfg.get("max_expirations", 6)),
+            strike_band_pct=float(options_snapshot_cfg.get("strike_band_pct", 0.3)),
+            strike_step=int(options_snapshot_cfg.get("strike_step", 1)),
+            exchange=str(options_snapshot_cfg.get("exchange", "SMART")),
+        ),
+        historical_ticks=HistoricalTicksConfig(
+            enabled=bool(ticks_cfg.get("enabled", False)),
+            start_date=ticks_cfg.get("start_date"),
+            end_date=ticks_cfg.get("end_date"),
+            chunk_seconds=int(ticks_cfg.get("chunk_seconds", 3600)),
+            max_ticks_per_request=int(ticks_cfg.get("max_ticks_per_request", 1000)),
+            min_request_interval_seconds=float(
+                ticks_cfg.get("min_request_interval_seconds", 1.0)
+            ),
+            max_retries=int(ticks_cfg.get("max_retries", 4)),
         ),
     )

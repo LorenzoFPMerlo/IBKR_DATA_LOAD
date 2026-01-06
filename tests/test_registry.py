@@ -23,8 +23,10 @@ def test_registry_contains_expected_names():
         "contract_details",
         "historical_bars",
         "option_chain_discovery",
-        "option_chain_snapshot",
+        "option_surface_snapshot_daily",
         "live_quote_snapshot",
         "fundamentals_report",
+        "historical_ticks_trades",
+        "tick_by_tick_trades_live",
     }
     assert expected.issubset(set(registry.datasets.keys()))

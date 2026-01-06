@@ -180,7 +180,7 @@ class DatasetRegistry:
                 incremental_key="underlying_conId",
                 capability_probe="options_data",
                 cost_estimate=2,
-                status="stub",
+                status="implemented",
                 reason="Discovery flow not wired to connector yet.",
             )
         )
@@ -277,13 +277,13 @@ class DatasetRegistry:
         )
         registry.add(
             DatasetDefinition(
-                name="tick_by_tick_live",
+                name="tick_by_tick_trades_live",
                 instrument_types=("stock", "etf", "index", "future", "option", "forex"),
                 request_type="reqTickByTickData",
                 parameter_schema={"tickType": "str"},
                 default_parameters={"tickType": "Last"},
                 chunking_strategy="streaming",
-                storage_schema=["timestamp_utc", "price", "size", "exchange"],
+                storage_schema=["timestamp_utc", "price", "size", "exchange", "conId"],
                 incremental_key="timestamp_utc",
                 capability_probe="market_data",
                 cost_estimate=5,
@@ -299,7 +299,7 @@ class DatasetRegistry:
                 parameter_schema={"numRows": "int"},
                 default_parameters={"numRows": 10},
                 chunking_strategy="streaming",
-                storage_schema=["timestamp_utc", "position", "side", "price", "size"],
+                storage_schema=["timestamp_utc", "position", "operation", "side", "price", "size", "marketMaker",],
                 incremental_key="timestamp_utc",
                 capability_probe="depth_data",
                 cost_estimate=6,
@@ -348,12 +348,11 @@ class DatasetRegistry:
                 parameter_schema={"start": "datetime", "end": "datetime"},
                 default_parameters={},
                 chunking_strategy="time_windows",
-                storage_schema=["time", "price", "size", "exchange", "specialConditions"],
+                storage_schema=["time", "price", "size", "exchange", "specialConditions", "conId", "dataset_id", "run_id"],
                 incremental_key="time",
                 capability_probe="historical_data",
                 cost_estimate=5,
-                status="stub",
-                reason="Historical tick retrieval not implemented.",
+                status="implemented",
             )
         )
         registry.add(
@@ -364,12 +363,11 @@ class DatasetRegistry:
                 parameter_schema={"start": "datetime", "end": "datetime"},
                 default_parameters={},
                 chunking_strategy="time_windows",
-                storage_schema=["time", "bid", "ask", "bidSize", "askSize"],
+                storage_schema=["time", "bid", "ask", "bidSize", "askSize", "conId", "dataset_id", "run_id"],
                 incremental_key="time",
                 capability_probe="historical_data",
                 cost_estimate=5,
-                status="stub",
-                reason="Historical tick retrieval not implemented.",
+                status="implemented",
             )
         )
         registry.add(
@@ -390,23 +388,19 @@ class DatasetRegistry:
         )
         registry.add(
             DatasetDefinition(
-                name="option_chain_snapshot",
+                name="option_surface_snapshot_daily",
                 instrument_types=("stock", "etf", "index"),
-                request_type="reqSecDefOptParams+reqMktData(snapshot)",
+                request_type="reqSecDefOptParams+reqMktDataSnapshot",
                 parameter_schema={
                     "snapshotDate": "date",
                     "max_contracts_per_batch": "int",
                 },
                 default_parameters={"snapshotDate": "today", "max_contracts_per_batch": 50},
-                chunking_strategy="by_expiration",
+                chunking_strategy="by_expiration_and_batches",
                 storage_schema=[
                     "snapshot_datetime_utc",
-                    "underlying_symbol",
                     "underlying_conId",
                     "option_conId",
-                    "tradingClass",
-                    "exchange",
-                    "currency",
                     "expiration",
                     "strike",
                     "right",
@@ -425,6 +419,9 @@ class DatasetRegistry:
                     "theta",
                     "pvDividend",
                     "undPrice",
+                    "tradingClass",
+                    "exchange",
+                    "currency",
                     "data_source",
                     "dataset_id",
                     "run_id",
@@ -433,8 +430,7 @@ class DatasetRegistry:
                 prerequisites=("option_chain_discovery",),
                 capability_probe="options_data",
                 cost_estimate=5,
-                status="stub",
-                reason="Option chain snapshots not implemented yet.",
+                status="implemented",
             )
         )
         registry.add(

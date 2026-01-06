@@ -18,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ticker", help="Ticker/symbol identifier")
     parser.add_argument("--profile", default="PROFILE_A", help="Dataset profile")
     parser.add_argument("--datasets", default="", help="Comma-separated dataset names")
+    parser.add_argument("--options-snapshot", action="store_true", help ="Run option surface snapshot (daily)",)
     parser.add_argument("--start-date", help="Start date (YYYY-MM-DD)")
     parser.add_argument("--end-date", help="End date (YYYY-MM-DD)")
     parser.add_argument("--duration", help="IB duration string")
@@ -33,7 +34,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", default="config/defaults.yaml", help="Defaults config")
     parser.add_argument("--user-config", default="config/user.yaml", help="User config override")
     return parser
-
 
 def main() -> int:
     parser = build_parser()
@@ -55,6 +55,8 @@ def main() -> int:
         start_date=args.start_date,
         end_date=args.end_date,
         resume=args.resume,
+        datasets=[value.strip() for value in args.datasets.split(",") if value.strip()],
+        options_snapshot=args.options_snapshot,
     )
     if dry_run:
         print(json.dumps(plan, indent=2))

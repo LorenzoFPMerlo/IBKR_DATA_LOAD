@@ -31,3 +31,22 @@ historical_bars:
   min_request_interval_seconds: 1.0
   max_retries: 6
   format_date: 1
+options:
+  discovery_cache_max_age_hours: 24
+  snapshot:
+    enabled: false
+    max_contracts_per_batch: 50
+    sleep_between_batches_seconds: 2.0
+    snapshot_wait_seconds: 2.0
+    max_expirations: 6
+    strike_band_pct: 0.3
+    strike_step: 1
+    exchange: SMART
+historical_ticks:
+  enabled: false
+  start_date: null
+  end_date: null
+  chunk_seconds: 3600
+  max_ticks_per_request: 1000
+  min_request_interval_seconds: 1.0
+  max_retries: 4

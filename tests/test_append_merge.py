@@ -1,6 +1,15 @@
 import pandas as pd
 
-from ibkr_data_load.config import AppConfig, ConnectionConfig, HistoricalBarsConfig, InstrumentConfig, LoggingConfig
+from ibkr_data_load.config import (
+    AppConfig,
+    ConnectionConfig,
+    HistoricalBarsConfig,
+    HistoricalTicksConfig,
+    InstrumentConfig,
+    LoggingConfig,
+    OptionsDiscoveryConfig,
+    OptionsSnapshotConfig,
+)
 from ibkr_data_load.execution.historical_bars import HistoricalBarsExecutor
 
 
@@ -29,6 +38,26 @@ def test_append_merge_idempotent(tmp_path):
             min_request_interval_seconds=0.0,
             max_retries=1,
             format_date=1,
+        ),
+        options_discovery=OptionsDiscoveryConfig(cache_max_age_hours=24),
+        options_snapshot=OptionsSnapshotConfig(
+            enabled=False,
+            max_contracts_per_batch=50,
+            sleep_between_batches_seconds=1.0,
+            snapshot_wait_seconds=1.0,
+            max_expirations=6,
+            strike_band_pct=0.3,
+            strike_step=1,
+            exchange="SMART",
+        ),
+        historical_ticks=HistoricalTicksConfig(
+            enabled=False,
+            start_date=None,
+            end_date=None,
+            chunk_seconds=3600,
+            max_ticks_per_request=1000,
+            min_request_interval_seconds=0.0,
+            max_retries=1,
         ),
     )
     executor = HistoricalBarsExecutor(config=config, run_id="test")

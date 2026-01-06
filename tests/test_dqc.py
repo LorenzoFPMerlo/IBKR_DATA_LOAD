@@ -1,9 +1,8 @@
 import pytest
-
+import pandas as pd
 pd = pytest.importorskip("pandas")
-
 from ibkr_data_load.dqc import run_bars_dqc
-
+from ibkr_data_load.dqc import run_ticks_dqc
 
 def test_dqc_gap_detection():
     df = pd.DataFrame(
@@ -51,3 +50,21 @@ def test_dqc_ohlc_outliers_and_duplicates():
     )
     assert result.summary["duplicate_count"] == 2
     assert result.summary["outlier_count"] == 1
+
+
+def test_ticks_dqc_sanity():
+    df = pd.DataFrame(
+        {
+            "time": pd.to_datetime(["2024-01-01", "2024-01-01"], utc=True),
+            "price": [1.0, -1.0],
+            "size": [10, 5],
+            "conId": [1, 1],
+            "dataset_id": ["d", "d"],
+        }
+    )
+    result = run_ticks_dqc(
+        df,
+        time_column="time",
+        key_columns=["time", "conId", "price", "size", "dataset_id"],
+    )
+    assert result.summary["invalid_count"] == 1
