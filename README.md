@@ -1,9 +1,7 @@
 # IBKR DATA LOADER
 
 ## Goal
-Single-ended application development (named "LOAD") for extracting any existing available data for any given IBKR covered financial instrument through API connection to TWS and IB Gateway (prioritize development on IB Gateway for big dataset extraction). Application must callable and importable into other projects as main data loader.
-
-LOAD is a Python 3.11+ CLI and library for planning and executing IBKR data extraction workflows. The current implementation provides configuration, dataset registry scaffolding, checkpoint utilities, and dry-run planning. Execution against IB Gateway/TWS will be implemented in subsequent iterations.
+Single-ended application development (named "LOAD") for extracting any existing available data for any given IBKR covered financial instrument through API connection to TWS and IB Gateway. LOAD is a Python 3.11+ CLI and library for planning and executing IBKR data extraction workflows.
 
 ## Data source
 Access to IBKR real-time and historical market and financial data depends on account's "Market data subscription" from Interactive Brokers (IBKR). Pricing and data bundle subscription availability go to: https://www.interactivebrokers.ca/en/accounts/fees/marketData.php?ib_entity=ca 

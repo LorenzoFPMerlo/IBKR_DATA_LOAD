@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--live", action="store_true", help="Enable live subscriptions")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoints")
     parser.add_argument("--dry-run", action="store_true", help="Plan-only; no IB calls")
+    parser.add_argument("--execute", action="store_true", help="Run IB requests")
     parser.add_argument("--dqc", default="warn", choices=["warn", "strict"], help="DQC mode")
     parser.add_argument("--output-dir", default="data", help="Output directory")
     parser.add_argument("--gateway", action="store_true", help="Use IB Gateway")
@@ -42,10 +43,20 @@ def main() -> int:
         parser.error("Provide --isin or --ticker.")
     config = load_config(Path(args.config), Path(args.user_config))
     logger = build_logger(config.logging)
-    logger.info("Starting LOAD (dry_run=%s)", args.dry_run)
+    dry_run = args.dry_run or not args.execute
+    logger.info("Starting LOAD (dry_run=%s)", dry_run)
     app = LoadApp.from_paths(args.config, args.user_config)
-    plan = app.run([identifier], dry_run=args.dry_run)
-    if args.dry_run:
+    identifier_type = "isin" if args.isin else "ticker"
+    plan = app.run_with_options(
+        [identifier],
+        identifier_type=identifier_type,
+        dry_run=dry_run,
+        execute=args.execute,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        resume=args.resume,
+    )
+    if dry_run:
         print(json.dumps(plan, indent=2))
     return 0
 

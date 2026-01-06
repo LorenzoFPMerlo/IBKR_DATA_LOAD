@@ -22,6 +22,25 @@ def test_dataset_id_deterministic():
     )
     assert first == second
 
+def test_dataset_id_parameter_normalization():
+    first = dataset_id(
+        con_id="123",
+        dataset_name="historical_bars",
+        parameters={"barSize": "1 DAY"},
+        data_source="ibkr",
+        timezone="UTC",
+        schema_version="1",
+    )
+    second = dataset_id(
+        con_id="123",
+        dataset_name="historical_bars",
+        parameters={"barSize": " 1   day "},
+        data_source="ibkr",
+        timezone="UTC",
+        schema_version="1",
+    )
+    assert first == second
+
 
 def test_atomic_write(tmp_path: Path):
     target = tmp_path / "data.json"

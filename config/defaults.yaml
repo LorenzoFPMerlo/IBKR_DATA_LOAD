@@ -6,3 +6,28 @@ connection:
   host: 127.0.0.1
   port: 4001
   client_id: 1
+  connect_timeout_seconds: 10
+  max_retries: 5
+  retry_backoff_seconds: 1
+instruments:
+  preferred_exchange: null
+  currency: null
+  security_types:
+    - stock
+    - index
+    - etf
+    - future
+    - option
+    - bond
+historical_bars:
+  enabled: true
+  bar_size: "1 day"
+  what_to_show: "TRADES"
+  use_rth: 1
+  start_date: null
+  end_date: null
+  chunk_duration: "1 Y"
+  overlap_bars: 5
+  min_request_interval_seconds: 1.0
+  max_retries: 6
+  format_date: 1
