@@ -1,6 +1,6 @@
-YOUR TASK => SINGLE BLACK-BOX CODEX PROMPT GENERATION FOR THE FOLLOWING PROJECT DEVELOPMENT AND PRODUCTION AND ADD YOUR RECOMMENDATIONS EVERYWHERE YOU READ (YOUR TASK) BELOW:
-
 PROJECT TITLE: IBKR DATA LOADER APPLICATION DEVELOPMENT
+
+REPOSITORY NAME: IBKR_DATA_LOAD 
 
 CONTEXT: Application development (named "LOAD") for extracting any existing available data through API connection to TWS and IB Gateway (prioritize development on IB Gateway for big dataset extraction). Financial data is key for the development of any quantitative finance or algorithmic trading application. Therefore, the first step of any model creation is the data source and quality. The bigger the better for data analytics. As your own generative model requires billions of tokens and data references for generating coherent and relevant text, a quantitative finance or/and trading model requires billions of time series data for generating any coherent and relevant investment strategy with learning objective to optimize risk/return trade-off and performance (beat the long broad-based stock market exposure). So, how do we approach the first step to gather enough datasets for the investment instrument (stocks, bonds, options, futures, ETFs. ETCs, ETPs, mutual funds, swaps, structured products (complete with your own research of all existing financial products offered by IBKR brokerage services (more than 150 global markets are covered by IBKR's brokerage license)). Each financial instrument is identifiable by three unique tokens: ticker/symbol, exchange/currency and ISIN. One of the unique token (ticker or ISIN) should be used as sole input for this application ("LOAD").
 
@@ -43,25 +43,15 @@ MAIN FUNCTIONALITIES AND FEATURES:
 
 2) Historical Data Handling & Extraction: review IBKR policy for data extraction. The application must be able to go get fetch data as far as possible in the past. For instance the S&P 500 Index has data going back to 1860 as shown by the works of Robert J. Shiller (see http://www.econ.yale.edu/~shiller/data.htm), and the application must be able to recreate datasets as large as this one by fetching piece by piece to prevent the API request to timeout (see IBKR's data extraction limitations. Historical data extraction will depend on many variables but the extraction must cover every possible historical data functionality (e.g. intraday 1s ticks and move 
 
-3) Historical Options Data Handling: most complex task of project which requires to save and aggregate historical dataset on options contracts which disappear after expiration. I want each day to connect to IBKR API and launch the "LOAD" application from Windows time scheduler, fetch options data including: options chains with bid/ask for all strikes and existing expirations, greeks, volumes, open interest (and the rest of data points to make the list exhaustive here); and finally drop into a .csv file the historization of these data points. For example, if i have a .csv file saved from previous friday with the data for VIX puts and calls, then on Monday I want to create a historical file with the dates 02.01.2026 and all the options data entries (several rows because options chains are tables with many strikes as rows and with bid/ask prices for puts/calls (4 price columns), bid/ask volumes for both puts/calls (4 columns) and implied volatility (1 column) and greeks (delta, gamma, vega, theta,...).
+3) Historical Options Data Handling & Extraction: most complex task of project which requires to save and aggregate historical dataset on options contracts which disappear after expiration. First approach, to fetch historical data for an option contract (strike, expiration defined) as shown on the graph on TWS. Second and optional approach, I want each day to connect to IBKR API and launch the "LOAD" application from Windows time scheduler, fetch options data including: options chains with bid/ask for all strikes and existing expirations, greeks, volumes, open interest (and the rest of data points to make the list exhaustive here); and finally drop into a .csv file the historization of these datasets (concatenation). For example, if i have a .csv file saved from previous friday with the data for VIX puts and calls, then on Monday I want to create a historical file with the dates 02.01.2026 and all the options data entries (several rows because options chains are tables with many strikes as rows and with bid/ask prices for puts/calls (4 price columns), bid/ask volumes for both puts/calls (4 columns) and greeks for each strike and expiration (delta, gamma, vega, theta,...). (YOUR TASK) Instruct the Codex on what would be the best combined approaches to save and aggregate over time many different datasets on options to analyze their price behaviors (same as for stocks but options are trickier to handle)? The bottom line I need as many as possible real market datasets on options to perform advanced quantitative and stochastic modelling on them (building in another project an option trading strategy).
 
-4) Files should have as many columns (1 column= 1 dataset) as possible to reduce the number of files and files with the same dataset should never co-exist. 
+4) Files should have as many columns (1 column= 1 dataset) as possible to reduce the number of files and files with the same dataset should never co-exist.
 
-5) Respective folders should be created for each financial instrument with folder name equal to the ticker and underlying folders representing the category of data that it contains (e.g. we input SPX and VIX and the folder creates two folders one for SPX and one for VIX and with underlying folders (in this case for financial indices) the category of data such as historical_spot_daily or historical_spot_intraday)
+6) Respective folders should be created for each financial instrument with folder name equal to the ticker and underlying folders representing the category of data that it contains (e.g. we input SPX and VIX and the folder creates two folders one for SPX and one for VIX and with underlying folders (in this case for financial indices) the category of data such as historical_spot_daily or historical_spot_intraday). Files should be saved as .csv which is common practice in financial industry. 
 
 LOGIC AND INFERENCE:
 
 Financial indices will not have the same range of data as a stock which is a real company. Indices do not have financial statements for example but stocks do. Indices have constituents which stocks do not have. ETFs have management fees or expense ratios which indices and stocks do not have. And the list goes on. Codex should be able to have a strong logic throughout the development of this project to make the codes consistent and consolidated. The application should be able to pinpoint the scope of each financial instrument's data points.
+Codex must first understand all the finite possibilities of data points available to any user via TWS or IB Gateway API. 
 
 ERROR PREVENTING AND RESOLUTION: ensure that no timeout error or other errors appear (likely related to API request, data saving, data files reading, data concatenation, dates format,...)
-
-The entire text above can be found in /docs/executive_production.txt for the Codex to read in case as well.
-
-NOTA BENE (YOUR TASK): for generating prompt, consider the optimization rules for Codex:
-1️⃣ Force a Plan
-2️⃣ Break tasks into numbered, ordered units
-3️⃣ Use hard constraints (negative instructions)
-4️⃣ Require intermediate artifacts
-5️⃣ Make correctness verifiable
-6️⃣ Specify what to do when blocked
-7️⃣ Stop conditions

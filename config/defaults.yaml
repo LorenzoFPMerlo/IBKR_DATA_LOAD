@@ -1,0 +1,8 @@
+output_dir: data
+logging:
+  level: INFO
+  json_logs: true
+connection:
+  host: 127.0.0.1
+  port: 4001
+  client_id: 1
