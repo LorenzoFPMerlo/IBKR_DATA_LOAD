@@ -12,6 +12,7 @@ from ib_insync import ContractDetails, IB
 from ibkr_data_load.checkpoint import Checkpoint, load_checkpoint, save_checkpoint
 from ibkr_data_load.config import AppConfig
 from ibkr_data_load.dqc import run_bars_dqc, write_bars_dqc
+from ibkr_data_load.retry_backoff import build_retryer
 from ibkr_data_load.utils import (
     atomic_write,
     dataset_id,
@@ -95,6 +96,8 @@ class HistoricalBarsExecutor:
             checkpoint = load_checkpoint(checkpoint_path)
             if checkpoint:
                 end_dt = datetime.fromisoformat(checkpoint.watermark)
+                if settings.overlap_bars > 0:
+                    end_dt = end_dt - self._bar_delta(settings.bar_size) * settings.overlap_bars
 
         chunk_duration = settings.chunk_duration
         expected_delta = self._bar_delta(settings.bar_size)
@@ -166,10 +169,15 @@ class HistoricalBarsExecutor:
         duration: str,
         settings,
     ) -> Iterable:
-        self._apply_pacing(settings.min_request_interval_seconds)
-        retries = 0
-        while True:
-            try:
+        retryer = build_retryer(
+            self.config.pacing,
+            self.logger,
+            self.run_id,
+            context={"dataset": "historical_bars", "conId": contract_details.contract.conId},
+        )
+        for attempt in retryer:
+            with attempt:
+                self._apply_pacing(settings.min_request_interval_seconds)
                 bars = ib.reqHistoricalData(
                     contract_details.contract,
                     endDateTime=end_dt,
@@ -181,19 +189,6 @@ class HistoricalBarsExecutor:
                 )
                 self._last_request_at = time.time()
                 return bars
-            except Exception as exc:
-                retries += 1
-                if retries > settings.max_retries:
-                    raise
-                backoff = min(2 ** retries, 60)
-                if self.logger:
-                    self.logger.warning(
-                        "run_id=%s historical data retry=%s error=%s",
-                        self.run_id,
-                        retries,
-                        exc,
-                    )
-                time.sleep(backoff)
 
     def _apply_pacing(self, min_interval: float) -> None:
         if self._last_request_at is None:

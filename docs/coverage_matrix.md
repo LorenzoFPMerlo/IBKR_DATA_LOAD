@@ -18,7 +18,7 @@
 | Options | option_surface_snapshot_daily | reqSecDefOptParams + reqMktData(snapshot) | stock, etf, index | implemented | options_data | Requires options market data; batch limits apply. |
 | Options | option_contract_bars | reqHistoricalData | option | stub | options_data | Requires option market data subscriptions. |
 | Options | option_contract_tick_by_tick | reqTickByTickData | option | stub | options_data | Requires tick-by-tick options entitlement. |
-| Fundamentals | fundamentals_report | reqFundamentalData | stock, etf, index | stub | fundamentals | Requires fundamentals subscription. |
+| Fundamentals | fundamentals_report | reqFundamentalData | stock, etf, index mutual fund | implemented | fundamentals | Requires fundamentals subscription; coverage varies by region/exchange. |
 | News | news_providers | reqNewsProviders | stock, etf, index, future, option | stub | news | News subscriptions required for premium feeds. |
 | News | historical_news | reqHistoricalNews | stock, etf, index, future, option | stub | news | Historical news requires news subscriptions. |
 | Corporate actions | corporate_actions | (no direct IB API) | stock, etf, index | unimplemented | market_data | Not provided by a reliable IB API endpoint. |

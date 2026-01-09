@@ -9,8 +9,10 @@ from typing import Iterable
 import pandas as pd
 from ib_insync import ContractDetails, IB
 
+from ibkr_data_load.checkpoint import Checkpoint, load_checkpoint, save_checkpoint
 from ibkr_data_load.config import AppConfig
 from ibkr_data_load.dqc import run_ticks_dqc, write_ticks_dqc
+from ibkr_data_load.retry_backoff import build_retryer
 from ibkr_data_load.utils import atomic_write, dataset_id, normalize_parameters
 
 SCHEMA_VERSION = "1"
@@ -40,6 +42,7 @@ class HistoricalTicksExecutor:
         what_to_show: str,
         start_date: str | None = None,
         end_date: str | None = None,
+        resume: bool = False,
     ) -> HistoricalTicksResult:
         settings = self.config.historical_ticks
         if not settings.enabled:
@@ -62,11 +65,24 @@ class HistoricalTicksExecutor:
             / "historical"
             / f"{dataset_name}__{dataset}.csv"
         )
+        checkpoint_path = (
+            Path(self.config.output_dir)
+            / instrument_id
+            / "meta"
+            / "checkpoints"
+            / f"{dataset}.json"
+        )
 
         start_dt = self._parse_date(start_date or settings.start_date)
         end_dt = self._parse_date(end_date or settings.end_date) or datetime.now(tz=timezone.utc)
         if start_dt is None:
             start_dt = end_dt - timedelta(seconds=settings.chunk_seconds)
+        if resume:
+            checkpoint = load_checkpoint(checkpoint_path)
+            if checkpoint:
+                start_dt = datetime.fromisoformat(checkpoint.watermark)
+                if settings.resume_overlap_seconds > 0:
+                    start_dt = start_dt - timedelta(seconds=settings.resume_overlap_seconds)
 
         ticks = []
         try:
@@ -95,6 +111,14 @@ class HistoricalTicksExecutor:
                 else:
                     last_dt = datetime.fromtimestamp(last_time, tz=timezone.utc)
                 current_start = max(current_end, last_dt + timedelta(seconds=1))
+                save_checkpoint(
+                    checkpoint_path,
+                    Checkpoint(
+                        dataset_id=dataset,
+                        watermark=last_dt.isoformat(),
+                        payload={"last_end": current_end.isoformat()},
+                    ),
+                )
         except Exception as exc:
             if self.logger:
                 self.logger.warning(
@@ -135,10 +159,19 @@ class HistoricalTicksExecutor:
         what_to_show: str,
         settings,
     ) -> Iterable:
-        self._apply_pacing(settings.min_request_interval_seconds)
-        retries = 0
-        while True:
-            try:
+        retryer = build_retryer(
+            self.config.pacing,
+            self.logger,
+            self.run_id,
+            context={
+                "dataset": "historical_ticks",
+                "conId": contract_details.contract.conId,
+                "what_to_show": what_to_show,
+            },
+        )
+        for attempt in retryer:
+            with attempt:
+                self._apply_pacing(settings.min_request_interval_seconds)
                 ticks = ib.reqHistoricalTicks(
                     contract_details.contract,
                     startDateTime=start_dt,
@@ -150,19 +183,6 @@ class HistoricalTicksExecutor:
                 )
                 self._last_request_at = time.time()
                 return ticks
-            except Exception as exc:
-                retries += 1
-                if retries > settings.max_retries:
-                    raise
-                backoff = min(2**retries, 60)
-                if self.logger:
-                    self.logger.warning(
-                        "run_id=%s historical ticks retry=%s error=%s",
-                        self.run_id,
-                        retries,
-                        exc,
-                    )
-                time.sleep(backoff)
 
     def _apply_pacing(self, min_interval: float) -> None:
         if self._last_request_at is None:

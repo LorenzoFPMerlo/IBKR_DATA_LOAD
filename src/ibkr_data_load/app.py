@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
-from datetime import datetime
+from datetime import datetime, timezone
+import time
 import json
 from ibkr_data_load.config import AppConfig, load_config
 from ibkr_data_load.connection.connector import IbkrConnector
@@ -14,6 +15,7 @@ from ibkr_data_load.execution import (
     run_market_depth_snapshot,
     run_tick_by_tick_trades_live,
 )
+from ibkr_data_load.execution.fundamentals import fetch_fundamentals
 from ibkr_data_load.logging import build_logger
 from ibkr_data_load.planner import build_plan
 from ibkr_data_load.instruments import InstrumentResolver
@@ -24,6 +26,7 @@ from ibkr_data_load.options.discovery import (
     discover_option_chain,
 )
 from ibkr_data_load.options.surface_snapshot import build_snapshot_plan, run_option_surface_snapshot
+from ibkr_data_load.utils import atomic_write
 
 @dataclass
 class LoadApp:
@@ -64,21 +67,40 @@ class LoadApp:
         resume: bool = False,
         datasets: Iterable[str] | None = None,
         options_snapshot: bool = False,
+        fundamentals_report_type: str | None = None,
     ) -> dict:
+        instruments_list = list(instruments)
         selected_datasets = self._resolve_datasets(datasets, options_snapshot)
-        plan = self.plan(instruments)
+        plan = self.plan(instruments_list)
         plan["selected_datasets"] = selected_datasets
         if dry_run or not execute:
             plan["dataset_plans"] = self._build_dataset_plans(
-                instruments,
+                instruments_list,
                 identifier_type,
                 selected_datasets,
                 start_date,
                 end_date,
+                fundamentals_report_type,
             )
             return plan
         logger = build_logger(self.config.logging)
         run_id = plan["run_id"]
+        run_summary = {
+            "run_id": run_id,
+            "start_time": datetime.now(tz=timezone.utc).isoformat(),
+            "end_time": None,
+            "instruments": instruments_list,
+            "datasets": [],
+        }
+        logger.info(
+            "Run started",
+            extra={
+                "run_id": run_id,
+                "status": "started",
+                "datasets": selected_datasets,
+                "instrument_count": len(instruments_list),
+            },
+        )
         connector = IbkrConnector(config=self.config, run_id=run_id, logger=logger)
 
         with connector.connect() as ib:
@@ -89,16 +111,23 @@ class LoadApp:
             ticks_executor = HistoricalTicksExecutor(
                 config=self.config, run_id=run_id, logger=logger
             )
-            for instrument in instruments:
+            for instrument in instruments_list:
                 resolved = resolver.resolve(ib, instrument, identifier_type=identifier_type)
                 if "historical_bars" in selected_datasets:
-                    bars_executor.run(
-                        ib,
-                        instrument_id=resolved.instrument_id,
-                        contract_details=resolved.contract_details,
-                        start_date=start_date,
-                        end_date=end_date,
-                        resume=resume,
+                    self._run_job(
+                        logger,
+                        run_summary,
+                        run_id,
+                        resolved.instrument_id,
+                        "historical_bars",
+                        lambda: bars_executor.run(
+                            ib,
+                            instrument_id=resolved.instrument_id,
+                            contract_details=resolved.contract_details,
+                            start_date=start_date,
+                            end_date=end_date,
+                            resume=resume,
+                        ),
                     )
 
                 if "option_chain_discovery" in selected_datasets or (
@@ -121,59 +150,166 @@ class LoadApp:
                         metadata = load_option_chain_metadata(metadata_path)
                     if "option_surface_snapshot_daily" in selected_datasets:
                         if self.config.options_snapshot.enabled:
-                            run_option_surface_snapshot(
-                                ib,
-                                resolved.instrument_id,
-                                resolved.contract_details,
-                                metadata,
-                                self.config,
-                                run_id,
+                            self._run_job(
                                 logger,
+                                run_summary,
+                                run_id,
+                                resolved.instrument_id,
+                                "option_surface_snapshot_daily",
+                                lambda: run_option_surface_snapshot(
+                                    ib,
+                                    resolved.instrument_id,
+                                    resolved.contract_details,
+                                    metadata,
+                                    self.config,
+                                    run_id,
+                                    logger,
+                                    resume=resume,
+                                ),
                             )
                         else:
-                            logger.warning(
-                                "Options snapshot disabled in config; skipping instrument=%s",
-                                instrument,
+                            self._log_job_status(
+                                logger,
+                                run_id,
+                                resolved.instrument_id,
+                                "option_surface_snapshot_daily",
+                                "skipped",
+                                error_message="Options snapshot disabled in config",
+                            )
+                            run_summary["datasets"].append(
+                                {
+                                    "instrument_id": resolved.instrument_id,
+                                    "dataset_name": "option_surface_snapshot_daily",
+                                    "status": "skipped",
+                                    "error_message": "Options snapshot disabled in config",
+                                }
                             )
 
                 if "historical_ticks_trades" in selected_datasets:
-                    ticks_executor.run(
-                        ib,
-                        instrument_id=resolved.instrument_id,
-                        contract_details=resolved.contract_details,
-                        dataset_name="historical_ticks_trades",
-                        what_to_show="TRADES",
-                        start_date=start_date,
-                        end_date=end_date,
+                    self._run_job(
+                        logger,
+                        run_summary,
+                        run_id,
+                        resolved.instrument_id,
+                        "historical_ticks_trades",
+                        lambda: ticks_executor.run(
+                            ib,
+                            instrument_id=resolved.instrument_id,
+                            contract_details=resolved.contract_details,
+                            dataset_name="historical_ticks_trades",
+                            what_to_show="TRADES",
+                            start_date=start_date,
+                            end_date=end_date,
+                            resume=resume,
+                        ),
                     )
 
                 if "historical_ticks_bid_ask" in selected_datasets:
-                    ticks_executor.run(
-                        ib,
-                        instrument_id=resolved.instrument_id,
-                        contract_details=resolved.contract_details,
-                        dataset_name="historical_ticks_bid_ask",
-                        what_to_show="BID_ASK",
-                        start_date=start_date,
-                        end_date=end_date,
+                    self._run_job(
+                        logger,
+                        run_summary,
+                        run_id,
+                        resolved.instrument_id,
+                        "historical_ticks_bid_ask",
+                        lambda: ticks_executor.run(
+                            ib,
+                            instrument_id=resolved.instrument_id,
+                            contract_details=resolved.contract_details,
+                            dataset_name="historical_ticks_bid_ask",
+                            what_to_show="BID_ASK",
+                            start_date=start_date,
+                            end_date=end_date,
+                            resume=resume,
+                        ),
                     )
 
                 if "tick_by_tick_trades_live" in selected_datasets:
-                    run_tick_by_tick_trades_live(
-                        ib,
-                        resolved.contract_details,
-                        duration_seconds=5,
-                        logger=logger,
+                    self._run_job(
+                        logger,
+                        run_summary,
+                        run_id,
+                        resolved.instrument_id,
+                        "tick_by_tick_trades_live",
+                        lambda: run_tick_by_tick_trades_live(
+                            ib,
+                            resolved.contract_details,
+                            duration_seconds=5,
+                            logger=logger,
+                        ),
                     )
 
                 if "market_depth" in selected_datasets:
-                    run_market_depth_snapshot(
-                        ib,
-                        resolved.contract_details,
-                        num_rows=10,
-                        duration_seconds=5,
-                        logger=logger,
+                    self._run_job(
+                        logger,
+                        run_summary,
+                        run_id,
+                        resolved.instrument_id,
+                        "market_depth",
+                        lambda: run_market_depth_snapshot(
+                            ib,
+                            resolved.contract_details,
+                            num_rows=10,
+                            duration_seconds=5,
+                            logger=logger,
+                        ),
                     )
+
+                if "fundamentals_report" in selected_datasets:
+                    dataset_def = self.registry.get("fundamentals_report")
+                    if self.config.fundamentals.enabled:
+                        self._run_job(
+                            logger,
+                            run_summary,
+                            run_id,
+                            resolved.instrument_id,
+                            "fundamentals_report",
+                            lambda: fetch_fundamentals(
+                                ib=ib,
+                                contract=resolved.contract_details.contract,
+                                dataset_def=dataset_def,
+                                config=self.config,
+                                logger=logger,
+                                run_id=run_id,
+                                instrument_id=resolved.instrument_id,
+                                report_type_override=fundamentals_report_type,
+                            ),
+                        )
+                    else:
+                        self._log_job_status(
+                            logger,
+                            run_id,
+                            resolved.instrument_id,
+                            "fundamentals_report",
+                            "skipped",
+                            error_message="Fundamentals disabled in config",
+                        )
+                        run_summary["datasets"].append(
+                            {
+                                "instrument_id": resolved.instrument_id,
+                                "dataset_name": "fundamentals_report",
+                                "status": "skipped",
+                                "error_message": "Fundamentals disabled in config",
+                            }
+                        )
+        run_summary["end_time"] = datetime.now(tz=timezone.utc).isoformat()
+        summary_path = (
+            Path(self.config.output_dir)
+            / "meta"
+            / "runs"
+            / run_id
+            / "run_summary.json"
+        )
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_payload = json.dumps(run_summary, indent=2)
+        atomic_write(summary_path, summary_payload)
+        logger.info(
+            "Run completed",
+            extra={
+                "run_id": run_id,
+                "status": "completed",
+                "dataset_count": len(run_summary["datasets"]),
+            },
+        )
         return plan
 
     def _resolve_datasets(
@@ -193,6 +329,7 @@ class LoadApp:
         selected_datasets: list[str],
         start_date: str | None,
         end_date: str | None,
+        fundamentals_report_type: str | None,
     ) -> dict:
         plans: dict[str, dict] = {}
         for instrument in instruments:
@@ -230,10 +367,89 @@ class LoadApp:
             if "historical_ticks_trades" in selected_datasets or "historical_ticks_bid_ask" in selected_datasets:
                 plan = self._plan_tick_windows(start_date, end_date)
                 instrument_plan["historical_ticks"] = plan
+            if "fundamentals_report" in selected_datasets:
+                instrument_plan["fundamentals_report"] = {
+                    "reportType": fundamentals_report_type
+                    or self.config.fundamentals.default_report_type
+                }
             if instrument_plan:
                 plans[instrument] = instrument_plan
         return plans
+    
+    def _log_job_status(
+        self,
+        logger,
+        run_id: str,
+        instrument_id: str,
+        dataset_name: str,
+        status: str,
+        stats: dict | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        payload = {
+            "run_id": run_id,
+            "instrument_id": instrument_id,
+            "dataset_name": dataset_name,
+            "status": status,
+        }
+        if stats is not None:
+            payload["stats"] = stats
+        if error_message:
+            payload["error_message"] = error_message
+        logger.info("Job status update", extra=payload)
 
+    def _run_job(
+        self,
+        logger,
+        run_summary: dict,
+        run_id: str,
+        instrument_id: str,
+        dataset_name: str,
+        runner,
+    ) -> None:
+        start = time.monotonic()
+        self._log_job_status(logger, run_id, instrument_id, dataset_name, "started")
+        try:
+            result = runner()
+            duration = time.monotonic() - start
+            stats = {
+                "duration_seconds": round(duration, 3),
+            }
+            if hasattr(result, "row_count"):
+                stats["rows_written"] = result.row_count
+            if hasattr(result, "dataset_id"):
+                stats["dataset_id"] = result.dataset_id
+            self._log_job_status(
+                logger, run_id, instrument_id, dataset_name, "succeeded", stats=stats
+            )
+            run_summary["datasets"].append(
+                {
+                    "instrument_id": instrument_id,
+                    "dataset_name": dataset_name,
+                    "status": "succeeded",
+                    "stats": stats,
+                }
+            )
+        except Exception as exc:
+            duration = time.monotonic() - start
+            self._log_job_status(
+                logger,
+                run_id,
+                instrument_id,
+                dataset_name,
+                "failed",
+                stats={"duration_seconds": round(duration, 3)},
+                error_message=str(exc),
+            )
+            run_summary["datasets"].append(
+                {
+                    "instrument_id": instrument_id,
+                    "dataset_name": dataset_name,
+                    "status": "failed",
+                    "error_message": str(exc),
+                }
+            )
+    
     def _plan_tick_windows(self, start_date: str | None, end_date: str | None) -> dict:
         settings = self.config.historical_ticks
         start_dt = self._parse_date(start_date or settings.start_date)

@@ -59,6 +59,7 @@ def test_snapshot_plan_counts():
         strike_band_pct=0.1,
         strike_step=1,
         exchange="SMART",
+        resume_overlap_batches=0,
     )
     plan = build_snapshot_plan(metadata, config, underlying_price=100.0)
     assert plan["expiration_count"] == 2

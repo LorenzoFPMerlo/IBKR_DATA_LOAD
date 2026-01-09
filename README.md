@@ -20,6 +20,12 @@ The application must load, fetch, extract any possible data available on a given
 load --ticker AAPL --dry-run
 ```
 
+### Fundamentals (dry-run + execute)
+```bash
+load --ticker AAPL --datasets fundamentals_report --dry-run
+load --ticker AAPL --datasets fundamentals_report --execute
+```
+
 ### Library
 ```python
 from ibkr_data_load import LOAD
@@ -27,6 +33,14 @@ from ibkr_data_load import LOAD
 app = LOAD.from_paths("config/defaults.yaml", "config/user.yaml")
 plan = app.run(["AAPL"], dry_run=True)
 ```
+
+### Resume after interruption
+```bash
+load --ticker AAPL --datasets historical_bars --execute --resume
+```
+
+### Scheduling (Windows Task Scheduler)
+See `docs/windows_scheduler.md` for a daily Task Scheduler recipe, including options surface snapshots and log redirection.
 
 ## Configuration
 Override values in `config/user.yaml`:
@@ -37,6 +51,27 @@ connection:
   port: 4001
   client_id: 1
 ```
+
+### Pacing / backoff
+Backoff for IBKR pacing is configuration-driven in `config/defaults.yaml`:
+```yaml
+pacing:
+  min_interval_seconds: 1.0
+  base_backoff_seconds: 2.0
+  max_backoff_seconds: 60.0
+  max_retries: 6
+
+
+Fundamentals data would be written under:
+data/<INSTRUMENT_ID>/fundamentals/fundamentals_report__<DATASET_ID>.csv
+and DQC outputs under:
+data/<INSTRUMENT_ID>/fundamentals/meta/dqc/<DATASET_ID>/...
+(created by the fundamentals execution module).
+
+A run summary would be written to:
+data/meta/runs/<RUN_ID>/run_summary.json
+(written at the end of run_with_options).
+
 
 ## Notes
 - Dry-run outputs only a job plan and does not call IBKR APIs.

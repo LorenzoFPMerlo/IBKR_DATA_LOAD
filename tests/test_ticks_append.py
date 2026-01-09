@@ -9,6 +9,8 @@ from ibkr_data_load.config import (
     LoggingConfig,
     OptionsDiscoveryConfig,
     OptionsSnapshotConfig,
+    PacingConfig,
+    FundamentalsConfig,
 )
 from ibkr_data_load.execution.historical_ticks import HistoricalTicksExecutor
 
@@ -17,6 +19,12 @@ def test_ticks_append_dedup(tmp_path):
     config = AppConfig(
         output_dir=str(tmp_path),
         logging=LoggingConfig(level="INFO", json_logs=False),
+        pacing=PacingConfig(
+            min_interval_seconds=0.0,
+            base_backoff_seconds=1.0,
+            max_backoff_seconds=2.0,
+            max_retries=1,
+        ),
         connection=ConnectionConfig(
             host="127.0.0.1",
             port=4001,
@@ -49,6 +57,7 @@ def test_ticks_append_dedup(tmp_path):
             strike_band_pct=0.3,
             strike_step=1,
             exchange="SMART",
+            resume_overlap_batches=0,
         ),
         historical_ticks=HistoricalTicksConfig(
             enabled=True,
@@ -58,7 +67,9 @@ def test_ticks_append_dedup(tmp_path):
             max_ticks_per_request=1000,
             min_request_interval_seconds=0.0,
             max_retries=1,
+            resume_overlap_seconds=0,
         ),
+        fundamentals=FundamentalsConfig(enabled=True, default_report_type="ReportsFinStatements"),
     )
     executor = HistoricalTicksExecutor(config=config, run_id="test")
     dataset = "ticks"

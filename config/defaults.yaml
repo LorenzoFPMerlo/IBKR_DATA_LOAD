@@ -2,6 +2,11 @@ output_dir: data
 logging:
   level: INFO
   json_logs: true
+pacing:
+  min_interval_seconds: 1.0
+  base_backoff_seconds: 2.0
+  max_backoff_seconds: 60.0
+  max_retries: 6
 connection:
   host: 127.0.0.1
   port: 4001
@@ -42,6 +47,7 @@ options:
     strike_band_pct: 0.3
     strike_step: 1
     exchange: SMART
+    resume_overlap_batches: 0
 historical_ticks:
   enabled: false
   start_date: null
@@ -50,3 +56,7 @@ historical_ticks:
   max_ticks_per_request: 1000
   min_request_interval_seconds: 1.0
   max_retries: 4
+  resume_overlap_seconds: 5
+fundamentals:
+  enabled: true
+  default_report_type: "ReportsFinStatements"

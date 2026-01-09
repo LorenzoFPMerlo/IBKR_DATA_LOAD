@@ -175,6 +175,41 @@ def run_ticks_dqc(
     )
 
 
+def run_fundamentals_dqc(
+    df: pd.DataFrame,
+    required_columns: Iterable[str],
+    key_columns: Iterable[str],
+) -> DqcResult:
+    missing = [col for col in required_columns if col not in df.columns]
+    schema_ok = not missing
+    nulls = check_nulls(df) if schema_ok else pd.DataFrame()
+    duplicates = check_duplicates(df, key_columns) if schema_ok else pd.DataFrame()
+    raw_payload_empty_count = 0
+    if schema_ok and "raw_payload" in df.columns:
+        raw_payload_empty_count = int(
+            df["raw_payload"].fillna("").astype(str).str.len().eq(0).sum()
+        )
+    key_nulls = {
+        col: int(df[col].isna().sum()) for col in key_columns if col in df.columns
+    }
+    summary = {
+        "row_count": len(df),
+        "duplicate_count": len(duplicates),
+        "null_counts": nulls.set_index("column")["null_count"].to_dict() if not nulls.empty else {},
+        "schema_ok": schema_ok,
+        "missing_columns": missing,
+        "raw_payload_empty_count": raw_payload_empty_count,
+        "key_null_counts": key_nulls,
+    }
+    return DqcResult(
+        summary=summary,
+        gaps=pd.DataFrame(),
+        duplicates=duplicates,
+        nulls=nulls,
+        outliers=pd.DataFrame(),
+    )
+
+
 def write_ticks_dqc(result: DqcResult, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     atomic_write(output_dir / "dqc_summary.json", json.dumps(result.summary, indent=2))
@@ -192,5 +227,14 @@ def write_bars_dqc(result: DqcResult, output_dir: Path) -> None:
     result.gaps.to_csv(output_dir / "dqc_gaps.csv", index=False)
     if not result.outliers.empty:
         result.outliers.to_csv(output_dir / "dqc_outliers.csv", index=False)
+    if not result.duplicates.empty:
+        result.duplicates.to_csv(output_dir / "dqc_duplicates.csv", index=False)
+
+
+def write_fundamentals_dqc(result: DqcResult, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    atomic_write(output_dir / "dqc_summary.json", json.dumps(result.summary, indent=2))
+    if not result.nulls.empty:
+        result.nulls.to_csv(output_dir / "dqc_nulls.csv", index=False)
     if not result.duplicates.empty:
         result.duplicates.to_csv(output_dir / "dqc_duplicates.csv", index=False)

@@ -13,6 +13,13 @@ class LoggingConfig:
     json_logs: bool
 
 @dataclass
+class PacingConfig:
+    min_interval_seconds: float
+    base_backoff_seconds: float
+    max_backoff_seconds: float
+    max_retries: int
+
+@dataclass
 class ConnectionConfig:
     host: str
     port: int
@@ -55,6 +62,7 @@ class OptionsSnapshotConfig:
     strike_band_pct: float
     strike_step: int
     exchange: str
+    resume_overlap_batches: int
 
 @dataclass
 class HistoricalTicksConfig:
@@ -65,17 +73,26 @@ class HistoricalTicksConfig:
     max_ticks_per_request: int
     min_request_interval_seconds: float
     max_retries: int
+    resume_overlap_seconds: int
+
+@dataclass
+class FundamentalsConfig:
+    enabled: bool
+    default_report_type: str
+
 
 @dataclass
 class AppConfig:
     output_dir: str
     logging: LoggingConfig
+    pacing: PacingConfig
     connection: ConnectionConfig
     instruments: InstrumentConfig
     historical_bars: HistoricalBarsConfig
     options_discovery: OptionsDiscoveryConfig
     options_snapshot: OptionsSnapshotConfig
     historical_ticks: HistoricalTicksConfig
+    fundamentals: FundamentalsConfig
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -130,17 +147,25 @@ def load_config(defaults_path: Path, user_path: Path) -> AppConfig:
     merged = _apply_env(merged)
 
     logging_cfg = merged.get("logging", {})
+    pacing_cfg = merged.get("pacing", {})
     conn_cfg = merged.get("connection", {})
     instruments_cfg = merged.get("instruments", {})
     historical_cfg = merged.get("historical_bars", {})
     options_cfg = merged.get("options", {})
     options_snapshot_cfg = options_cfg.get("snapshot", {})
     ticks_cfg = merged.get("historical_ticks", {})
+    fundamentals_cfg = merged.get("fundamentals", {})
     return AppConfig(
         output_dir=merged.get("output_dir", "data"),
         logging=LoggingConfig(
             level=logging_cfg.get("level", "INFO"),
             json_logs=logging_cfg.get("json_logs", True),
+        ),
+        pacing=PacingConfig(
+            min_interval_seconds=float(pacing_cfg.get("min_interval_seconds", 1.0)),
+            base_backoff_seconds=float(pacing_cfg.get("base_backoff_seconds", 2.0)),
+            max_backoff_seconds=float(pacing_cfg.get("max_backoff_seconds", 60.0)),
+            max_retries=int(pacing_cfg.get("max_retries", 6)),
         ),
         connection=ConnectionConfig(
             host=conn_cfg.get("host", "127.0.0.1"),
@@ -189,6 +214,7 @@ def load_config(defaults_path: Path, user_path: Path) -> AppConfig:
             strike_band_pct=float(options_snapshot_cfg.get("strike_band_pct", 0.3)),
             strike_step=int(options_snapshot_cfg.get("strike_step", 1)),
             exchange=str(options_snapshot_cfg.get("exchange", "SMART")),
+            resume_overlap_batches=int(options_snapshot_cfg.get("resume_overlap_batches", 0)),
         ),
         historical_ticks=HistoricalTicksConfig(
             enabled=bool(ticks_cfg.get("enabled", False)),
@@ -200,5 +226,12 @@ def load_config(defaults_path: Path, user_path: Path) -> AppConfig:
                 ticks_cfg.get("min_request_interval_seconds", 1.0)
             ),
             max_retries=int(ticks_cfg.get("max_retries", 4)),
+            resume_overlap_seconds=int(ticks_cfg.get("resume_overlap_seconds", 5)),
+        ),
+        fundamentals=FundamentalsConfig(
+            enabled=bool(fundamentals_cfg.get("enabled", True)),
+            default_report_type=str(
+                fundamentals_cfg.get("default_report_type", "ReportsFinStatements")
+            ),
         ),
     )

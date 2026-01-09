@@ -17,14 +17,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--isin", help="ISIN identifier")
     parser.add_argument("--ticker", help="Ticker/symbol identifier")
     parser.add_argument("--profile", default="PROFILE_A", help="Dataset profile")
-    parser.add_argument("--datasets", default="", help="Comma-separated dataset names")
+    parser.add_argument("--datasets", default="", help="Comma-separated dataset names (e.g., fundamentals_report)")
     parser.add_argument("--options-snapshot", action="store_true", help ="Run option surface snapshot (daily)",)
     parser.add_argument("--start-date", help="Start date (YYYY-MM-DD)")
     parser.add_argument("--end-date", help="End date (YYYY-MM-DD)")
     parser.add_argument("--duration", help="IB duration string")
     parser.add_argument("--bar-size", help="IB bar size string")
     parser.add_argument("--live", action="store_true", help="Enable live subscriptions")
-    parser.add_argument("--resume", action="store_true", help="Resume from checkpoints")
+    parser.add_argument("--resume", action="store_true", help="Resume from checkpoints in data/.../meta/checkpoints")
+    parser.add_argument("--fundamentals-report-type", help="Override fundamentals report type (e.g., ReportsFinStatements)")
     parser.add_argument("--dry-run", action="store_true", help="Plan-only; no IB calls")
     parser.add_argument("--execute", action="store_true", help="Run IB requests")
     parser.add_argument("--dqc", default="warn", choices=["warn", "strict"], help="DQC mode")
@@ -57,6 +58,7 @@ def main() -> int:
         resume=args.resume,
         datasets=[value.strip() for value in args.datasets.split(",") if value.strip()],
         options_snapshot=args.options_snapshot,
+        fundamentals_report_type=args.fundamentals_report_type,
     )
     if dry_run:
         print(json.dumps(plan, indent=2))

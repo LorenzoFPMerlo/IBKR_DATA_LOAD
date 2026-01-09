@@ -485,17 +485,29 @@ class DatasetRegistry:
         registry.add(
             DatasetDefinition(
                 name="fundamentals_report",
-                instrument_types=("stock", "etf", "index"),
+                instrument_types=("stock", "etf", "mutual_fund"),
                 request_type="reqFundamentalData",
                 parameter_schema={"reportType": "str"},
-                default_parameters={"reportType": "ReportsFinSummary"},
+                default_parameters={"reportType": "ReportsFinStatements"},
                 chunking_strategy="none",
-                storage_schema=["conId", "symbol", "report_type", "asof", "payload"],
-                incremental_key="asof",
+                storage_schema=[
+                    "conId",
+                    "symbol",
+                    "secType",
+                    "currency",
+                    "reportType",
+                    "asOf_datetime_utc",
+                    "raw_payload_type",
+                    "raw_payload",
+                    "data_source",
+                    "dataset_id",
+                    "run_id",
+                ],
+                incremental_key="asOf_datetime_utc",
                 capability_probe="fundamentals",
                 cost_estimate=2,
-                status="stub",
-                reason="Fundamentals retrieval not implemented.",
+                status="implemented",
+                reason="",
             )
         )
         registry.add(

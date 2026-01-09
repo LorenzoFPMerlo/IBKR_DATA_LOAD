@@ -10,8 +10,10 @@ from typing import Iterable
 import pandas as pd
 from ib_insync import ContractDetails, IB, Option, Ticker
 
+from ibkr_data_load.checkpoint import Checkpoint, load_checkpoint, save_checkpoint
 from ibkr_data_load.config import AppConfig, OptionsSnapshotConfig
 from ibkr_data_load.options.discovery import OptionChainMetadata
+from ibkr_data_load.retry_backoff import build_retryer
 from ibkr_data_load.utils import atomic_write, dataset_id, normalize_parameters
 
 SCHEMA_VERSION = "1"
@@ -253,6 +255,7 @@ def run_option_surface_snapshot(
     config: AppConfig,
     run_id: str,
     logger,
+    resume: bool = False,
 ) -> OptionSurfaceSnapshotResult:
     snapshot_cfg = config.options_snapshot
     if not snapshot_cfg.enabled:
@@ -294,6 +297,13 @@ def run_option_surface_snapshot(
         / snapshot_date.strftime("%Y/%m/%d")
         / f"option_surface_snapshot_daily__{dataset}.csv"
     )
+    checkpoint_path = (
+        Path(config.output_dir)
+        / instrument_id
+        / "meta"
+        / "checkpoints"
+        / f"{dataset}.json"
+    )
     registry_path = (
         Path(config.output_dir)
         / instrument_id
@@ -307,10 +317,33 @@ def run_option_surface_snapshot(
     rows: list[dict] = []
     qualified_contracts: list[Option] = []
 
-    for batch in _batch_contracts(contracts, snapshot_cfg.max_contracts_per_batch):
-        retries = 0
-        while True:
+    start_batch_index = 0
+    if resume:
+        checkpoint = load_checkpoint(checkpoint_path)
+        if checkpoint:
             try:
+                start_batch_index = int(checkpoint.watermark)
+            except ValueError:
+                start_batch_index = 0
+            if snapshot_cfg.resume_overlap_batches > 0:
+                start_batch_index = max(
+                    0, start_batch_index - snapshot_cfg.resume_overlap_batches
+                )
+
+    retryer = build_retryer(
+        config.pacing,
+        logger,
+        run_id,
+        context={"dataset": "option_surface_snapshot_daily", "instrument_id": instrument_id},
+    )
+
+    for batch_index, batch in enumerate(
+        _batch_contracts(contracts, snapshot_cfg.max_contracts_per_batch)
+    ):
+        if batch_index < start_batch_index:
+            continue
+        for attempt in retryer:
+            with attempt:
                 qualified_batch = ib.qualifyContracts(*batch)
                 qualified_contracts.extend(qualified_batch)
                 tickers = [
@@ -329,19 +362,14 @@ def run_option_surface_snapshot(
                         )
                     )
                     ib.cancelMktData(ticker.contract)
-                break
-            except Exception as exc:
-                retries += 1
-                if retries > 3:
-                    raise
-                if logger:
-                    logger.warning(
-                        "run_id=%s option snapshot batch retry=%s error=%s",
-                        run_id,
-                        retries,
-                        exc,
-                    )
-                time.sleep(min(2**retries, 30))
+        save_checkpoint(
+            checkpoint_path,
+            Checkpoint(
+                dataset_id=dataset,
+                watermark=str(batch_index + 1),
+                payload={"last_batch_index": batch_index},
+            ),
+        )       
         time.sleep(snapshot_cfg.sleep_between_batches_seconds)
 
     df = pd.DataFrame(rows)
