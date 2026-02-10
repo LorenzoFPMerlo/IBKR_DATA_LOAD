@@ -435,6 +435,53 @@ class DatasetRegistry:
         )
         registry.add(
             DatasetDefinition(
+                name="option_contract_historical_bars",
+                instrument_types=("stock", "etf", "index"),
+                request_type="reqHistoricalData(option contracts)",
+                parameter_schema={
+                    "expirations_next": "int",
+                    "expirations": "list[str]",
+                    "strikes": "list[float]",
+                    "strikes_nearest": "int",
+                    "rights": "str",
+                    "max_contracts": "int",
+                    "barSize": "str",
+                    "duration": "str",
+                    "whatToShow": "str",
+                    "useRTH": "int",
+                },
+                default_parameters={
+                    "expirations_next": 1,
+                    "rights": "both",
+                    "max_contracts": 100,
+                    "barSize": "1 day",
+                    "duration": "1 M",
+                    "whatToShow": "TRADES",
+                    "useRTH": 1,
+                },
+                chunking_strategy="by_contract_batches_and_time_windows",
+                storage_schema=[
+                    "time",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "wap",
+                    "barCount",
+                    "option_conId",
+                    "dataset_id",
+                ],
+                incremental_key="time",
+                prerequisites=("option_chain_discovery",),
+                capability_probe="options_data",
+                cost_estimate=6,
+                status="implemented",
+            )
+        )
+
+        registry.add(
+            DatasetDefinition(
                 name="option_contract_bars",
                 instrument_types=("option",),
                 request_type="reqHistoricalData",

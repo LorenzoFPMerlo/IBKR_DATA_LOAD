@@ -1,0 +1,12 @@
+{
+  "dataset_name": "dummy_dataset",
+  "dataset_id": "dummy",
+  "parameters_used": {},
+  "chunks_attempted": null,
+  "chunks_succeeded": null,
+  "chunks_failed": null,
+  "rows_written": 1,
+  "elapsed_seconds": 0.0,
+  "checkpoint_used": false,
+  "final_status": "succeeded"
+}

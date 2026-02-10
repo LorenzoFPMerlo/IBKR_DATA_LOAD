@@ -80,6 +80,11 @@ class InstrumentResolver:
 
     def _resolve_ticker(self, ib: IB, ticker: str) -> list[ContractDetails]:
         candidates: list[ContractDetails] = []
+        if ticker.upper() in {"SPX", "VIX"}:
+            try:
+                candidates.extend(ib.reqContractDetails(Index(ticker, "CBOE")))
+            except Exception:
+                pass
         try:
             matches = ib.reqMatchingSymbols(ticker)
             for match in matches:
@@ -109,6 +114,8 @@ class InstrumentResolver:
         if sec_type == "stock" or sec_type == "etf":
             return Stock(ticker, exchange, self.config.instruments.currency or "USD")
         if sec_type == "index":
+            if ticker.upper() in {"SPX", "VIX"}:
+                return Index(ticker, "CBOE")
             return Index(ticker, exchange)
         if sec_type == "future":
             return Contract(symbol=ticker, secType="FUT", exchange=exchange)

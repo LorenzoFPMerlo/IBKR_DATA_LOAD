@@ -1,0 +1,38 @@
+
+NOTA BENE: here is a recapitulation of the outputs obtained by running all the commands of Python Package
+
+$ load --help
+usage: load [-h] [--isin ISIN] [--ticker TICKER] [--profile PROFILE] [--datasets DATASETS] [--options-snapshot]
+            [--start-date START_DATE] [--end-date END_DATE] [--duration DURATION] [--bar-size BAR_SIZE] [--live]
+            [--resume] [--fundamentals-report-type FUNDAMENTALS_REPORT_TYPE] [--dry-run] [--execute]
+            [--dqc {warn,strict}] [--output-dir OUTPUT_DIR] [--gateway] [--tws] [--config CONFIG]
+            [--user-config USER_CONFIG]
+
+IBKR data loader (IB Gateway/TWS).
+
+options:
+  -h, --help            show this help message and exit
+  --isin ISIN           ISIN identifier
+  --ticker TICKER       Ticker/symbol identifier
+  --profile PROFILE     Dataset profile
+  --datasets DATASETS   Comma-separated dataset names (e.g., fundamentals_report)
+  --options-snapshot    Run option surface snapshot (daily)
+  --start-date START_DATE
+                        Start date (YYYY-MM-DD)
+  --end-date END_DATE   End date (YYYY-MM-DD)
+  --duration DURATION   IB duration string
+  --bar-size BAR_SIZE   IB bar size string
+  --live                Enable live subscriptions
+  --resume              Resume from checkpoints in data/.../meta/checkpoints
+  --fundamentals-report-type FUNDAMENTALS_REPORT_TYPE
+                        Override fundamentals report type (e.g., ReportsFinStatements)
+  --dry-run             Plan-only; no IB calls
+  --execute             Run IB requests
+  --dqc {warn,strict}   DQC mode
+  --output-dir OUTPUT_DIR
+                        Output directory
+  --gateway             Use IB Gateway
+  --tws                 Use TWS
+  --config CONFIG       Defaults config
+  --user-config USER_CONFIG
+                        User config override
