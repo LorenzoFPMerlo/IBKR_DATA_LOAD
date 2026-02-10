@@ -1,0 +1,17 @@
+{
+  "dataset_name": "historical_bars",
+  "dataset_id": "c4fc95e47d804bc01a9150f339b508c685f00dbcdb856f937a6c05f7682305da",
+  "parameters_used": {
+    "barSize": "1 day",
+    "duration": "1 Y",
+    "whatToShow": "TRADES",
+    "useRTH": 1
+  },
+  "chunks_attempted": 2,
+  "chunks_succeeded": 0,
+  "chunks_failed": 0,
+  "rows_written": 9,
+  "elapsed_seconds": 1.703,
+  "checkpoint_used": false,
+  "final_status": "succeeded"
+}

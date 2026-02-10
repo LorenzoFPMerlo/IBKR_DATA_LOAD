@@ -23,6 +23,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--end-date", help="End date (YYYY-MM-DD)")
     parser.add_argument("--duration", help="IB duration string")
     parser.add_argument("--bar-size", help="IB bar size string")
+    parser.add_argument("--currency", help="Instrument resolution currency override (e.g., USD)")
+    parser.add_argument("--primary-exchange", help="Instrument resolution primary exchange override (e.g., ARCA)")
+    parser.add_argument("--sec-type", help="Instrument resolution secType override (e.g., STK, IND)")
+    parser.add_argument("--exchange", help="Instrument resolution exchange override (e.g., SMART, CBOE)")
     parser.add_argument("--live", action="store_true", help="Enable live subscriptions")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoints in data/.../meta/checkpoints")
     parser.add_argument("--debug-ib", action="store_true", help="Enable verbose IB diagnostics bundle output")
@@ -84,6 +88,10 @@ def main() -> int:
         option_max_contracts=args.max_contracts,
         option_bar_size=args.bar_size,
         option_duration=args.duration,
+        resolution_currency=args.currency,
+        resolution_primary_exchange=args.primary_exchange,
+        resolution_sec_type=args.sec_type,
+        resolution_exchange=args.exchange,
     )
     if dry_run:
         print(json.dumps(plan, indent=2))

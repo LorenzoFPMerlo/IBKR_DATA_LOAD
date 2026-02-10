@@ -1,0 +1,19 @@
+{
+  "row_count": 5503,
+  "duplicate_count": 0,
+  "gap_count": 1210,
+  "null_counts": {
+    "time": 0,
+    "open": 0,
+    "high": 0,
+    "low": 0,
+    "close": 0,
+    "volume": 0,
+    "wap": 0,
+    "barCount": 0,
+    "conId": 0,
+    "dataset_id": 0
+  },
+  "outlier_count": 0,
+  "gap_mode": "delta_only"
+}

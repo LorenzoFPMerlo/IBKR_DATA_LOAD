@@ -3,6 +3,7 @@ from .resolver import (
     InstrumentNotFoundError,
     InstrumentResolver,
     ResolvedInstrument,
+    ResolutionOverrides,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "InstrumentNotFoundError",
     "InstrumentResolver",
     "ResolvedInstrument",
+    "ResolutionOverrides",
 ]

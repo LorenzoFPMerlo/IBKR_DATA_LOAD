@@ -1,0 +1,38 @@
+{
+  "input": {
+    "identifier": "SPY",
+    "identifier_type": "ticker"
+  },
+  "timestamp": "2026-02-10T17:11:56.035031+00:00",
+  "candidate_count": 1,
+  "filters_applied": {
+    "policy": {
+      "sec_type": "STK",
+      "exchange": "SMART",
+      "currency": "USD",
+      "primary_exchange": "ARCA"
+    },
+    "overrides": {
+      "sec_type": null,
+      "exchange": null,
+      "currency": "USD",
+      "primary_exchange": "ARCA"
+    },
+    "default_security_types": [
+      "STK",
+      "IND",
+      "STK",
+      "FUT"
+    ]
+  },
+  "chosen_contract": {
+    "symbol": "SPY",
+    "secType": "STK",
+    "exchange": "SMART",
+    "currency": "USD",
+    "conId": 756733,
+    "localSymbol": "SPY",
+    "primaryExchange": "ARCA"
+  },
+  "rejected_candidates_top5": []
+}

@@ -1,0 +1,35 @@
+{
+  "input": {
+    "identifier": "SPX",
+    "identifier_type": "ticker"
+  },
+  "timestamp": "2026-02-10T17:20:51.544956+00:00",
+  "candidate_count": 1,
+  "filters_applied": {
+    "policy": {
+      "sec_type": "IND",
+      "exchange": "CBOE",
+      "currency": "USD",
+      "primary_exchange": "CBOE"
+    },
+    "overrides": {
+      "sec_type": "IND",
+      "exchange": "CBOE",
+      "currency": "USD",
+      "primary_exchange": null
+    },
+    "default_security_types": [
+      "IND"
+    ]
+  },
+  "chosen_contract": {
+    "symbol": "SPX",
+    "secType": "IND",
+    "exchange": "CBOE",
+    "currency": "USD",
+    "conId": 416904,
+    "localSymbol": "SPX",
+    "primaryExchange": ""
+  },
+  "rejected_candidates_top5": []
+}

@@ -1,0 +1,26 @@
+{
+  "run_id": "20260210T171251Z",
+  "start_time": "2026-02-10T17:12:51.189632+00:00",
+  "end_time": "2026-02-10T17:15:02.078616+00:00",
+  "instruments": [
+    "SPX"
+  ],
+  "datasets": [
+    {
+      "instrument_id": "SPX_IND_USD_416904",
+      "dataset_name": "option_surface_snapshot_daily",
+      "status": "skipped",
+      "error_message": "Options snapshot disabled in config"
+    },
+    {
+      "instrument_id": "SPX_IND_USD_416904",
+      "dataset_name": "option_contract_historical_bars",
+      "status": "succeeded",
+      "stats": {
+        "duration_seconds": 129.671,
+        "rows_written": 18410,
+        "dataset_id": "5da2dcc424cebbc062a888c1a64c05fe8d956aebee75cab161fd77925e5f7b92"
+      }
+    }
+  ]
+}

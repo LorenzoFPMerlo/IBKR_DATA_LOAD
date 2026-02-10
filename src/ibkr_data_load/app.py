@@ -20,7 +20,7 @@ from ibkr_data_load.execution import (
     run_tick_by_tick_trades_live,
 )
 from ibkr_data_load.execution.fundamentals import fetch_fundamentals
-from ibkr_data_load.instruments import InstrumentResolver
+from ibkr_data_load.instruments import InstrumentResolver, ResolutionOverrides
 from ibkr_data_load.logging import build_logger
 from ibkr_data_load.options.discovery import (
     discover_option_chain,
@@ -76,6 +76,10 @@ class LoadApp:
         option_bar_size: str | None = None,
         option_duration: str | None = None,
         fundamentals_report_type: str | None = None,
+        resolution_currency: str | None = None,
+        resolution_primary_exchange: str | None = None,
+        resolution_sec_type: str | None = None,
+        resolution_exchange: str | None = None,
     ) -> dict:
         instruments_list = list(instruments)
         selected_datasets = self._resolve_datasets(datasets, options_snapshot)
@@ -106,13 +110,19 @@ class LoadApp:
             duration=option_duration,
         )
         connector = IbkrConnector(config=self.config, run_id=run_id, logger=logger)
+        resolution_overrides = ResolutionOverrides(
+            sec_type=resolution_sec_type.upper() if resolution_sec_type else None,
+            exchange=resolution_exchange.upper() if resolution_exchange else None,
+            primary_exchange=resolution_primary_exchange.upper() if resolution_primary_exchange else None,
+            currency=resolution_currency.upper() if resolution_currency else None,
+        )
 
         with connector.connect() as ib:
             resolver = InstrumentResolver(config=self.config, run_id=run_id, logger=logger)
             bars_executor = HistoricalBarsExecutor(config=self.config, run_id=run_id, logger=logger, debug_ib=debug_ib)
             ticks_executor = HistoricalTicksExecutor(config=self.config, run_id=run_id, logger=logger)
             for instrument in instruments_list:
-                resolved = resolver.resolve(ib, instrument, identifier_type=identifier_type)
+                resolved = resolver.resolve(ib, instrument, identifier_type=identifier_type, overrides=resolution_overrides)
                 if "historical_bars" in selected_datasets:
                     self._run_job(
                     logger, run_summary, run_id, resolved.instrument_id, "historical_bars",
@@ -128,11 +138,18 @@ class LoadApp:
                     else:
                         metadata = load_option_chain_metadata(metadata_path)
                     
-                    if self.config.options_snapshot.enabled:
+                    if metadata is not None and not metadata.entries:
+                        self._append_skipped(run_summary, logger, run_id, resolved.instrument_id, "option_chain_discovery", "no options chain available")
+                        metadata = None
+
+                    if self.config.options_snapshot.enabled and metadata is not None:
                         self._run_job(
                             logger, run_summary, run_id, resolved.instrument_id, "option_surface_snapshot_daily",
                             lambda: run_option_surface_snapshot(ib, resolved.instrument_id, resolved.contract_details, metadata, self.config, run_id, logger, resume=resume),
                         )
+                    elif metadata is None:
+                        self._append_skipped(run_summary, logger, run_id, resolved.instrument_id, "option_surface_snapshot_daily", "no options chain available")
+
                     else:
                         self._append_skipped(run_summary, logger, run_id, resolved.instrument_id, "option_surface_snapshot_daily", "Options snapshot disabled in config")
 
@@ -303,6 +320,9 @@ class LoadApp:
                 payload = json.loads(resolution_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 continue
-            if payload.get("identifier") == identifier and payload.get("identifier_type") == identifier_type:
+            payload_input = payload.get("input", {})
+            resolved_identifier = payload.get("identifier", payload_input.get("identifier"))
+            resolved_identifier_type = payload.get("identifier_type", payload_input.get("identifier_type"))
+            if resolved_identifier == identifier and resolved_identifier_type == identifier_type:
                 return resolution_path.parent.parent.name
         return None

@@ -27,6 +27,33 @@ class ResolvedInstrument:
     contract_details: ContractDetails
 
 
+@dataclass(frozen=True)
+class ResolutionOverrides:
+    sec_type: str | None = None
+    exchange: str | None = None
+    primary_exchange: str | None = None
+    currency: str | None = None
+
+
+@dataclass(frozen=True)
+class ResolutionPolicy:
+    stock_like_sec_types: tuple[str, ...] = ("STK", "ETF")
+    index_sec_types: tuple[str, ...] = ("IND",)
+    allowed_ticker_sec_types: tuple[str, ...] = ("STK", "ETF", "IND", "FUT")
+    stock_like_primary_exchanges: tuple[str, ...] = ("ARCA", "NYSE", "NASDAQ", "ISLAND")
+    index_exchanges: tuple[str, ...] = ("CBOE", "SMART")
+    default_exchange: str = "SMART"
+    default_currency: str = "USD"
+
+
+@dataclass(frozen=True)
+class CandidateDecision:
+    details: ContractDetails
+    keep: bool
+    score: int
+    reasons: list[str]
+
+
 SEC_TYPE_MAP = {
     "stock": "STK",
     "etf": "STK",
@@ -43,26 +70,44 @@ class InstrumentResolver:
         self.run_id = run_id
         self.logger = logger or build_logger(config.logging)
 
-    def resolve(self, ib: IB, identifier: str, identifier_type: str) -> ResolvedInstrument:
+    WELL_KNOWN_TICKERS: dict[str, dict[str, str]] = {
+        "SPY": {"sec_type": "STK", "exchange": "SMART", "currency": "USD", "primary_exchange": "ARCA"},
+        "SPX": {"sec_type": "IND", "exchange": "CBOE", "currency": "USD", "primary_exchange": "CBOE"},
+        "VIX": {"sec_type": "IND", "exchange": "CBOE", "currency": "USD", "primary_exchange": "CBOE"},
+    }
+
+    def resolve(
+        self,
+        ib: IB,
+        identifier: str,
+        identifier_type: str,
+        overrides: ResolutionOverrides | None = None,
+    ) -> ResolvedInstrument:
         if identifier_type not in {"isin", "ticker"}:
             raise ValueError("identifier_type must be 'isin' or 'ticker'")
         if identifier_type == "isin":
             candidates = self._resolve_isin(ib, identifier)
+            decisions = self._apply_hints(candidates)
         else:
-            candidates = self._resolve_ticker(ib, identifier)
+            candidates = self._resolve_ticker(ib, identifier, overrides)
+            decisions = self._select_ticker_candidates(identifier, candidates, overrides)
 
-        filtered = self._apply_hints(candidates)
+        filtered = [decision for decision in decisions if decision.keep]
         if not filtered:
+            self._persist_resolution(identifier, identifier_type, candidates, None, "unresolved", decisions, overrides)
             raise InstrumentNotFoundError(f"No contract found for {identifier}")
-        if len(filtered) > 1:
-            candidate_payload = [self._format_candidate(c) for c in filtered]
+        top_score = max(decision.score for decision in filtered)
+        winners = [decision for decision in filtered if decision.score == top_score]
+        if len(winners) > 1:
+            candidate_payload = [self._format_candidate(decision.details) for decision in winners]
+            self._persist_resolution(identifier, identifier_type, candidates, None, "ambiguous", decisions, overrides)
             raise AmbiguousInstrumentError(
                 f"Ambiguous instrument for {identifier}: {json.dumps(candidate_payload, indent=2)}"
             )
 
-        selected = filtered[0]
+        selected = winners[0].details
         instrument_id = self._canonical_id(selected.contract)
-        self._persist_resolution(identifier, identifier_type, candidates, selected, instrument_id)
+        self._persist_resolution(identifier, identifier_type, candidates, selected, instrument_id, decisions, overrides)
         return ResolvedInstrument(instrument_id=instrument_id, contract_details=selected)
 
     def _resolve_isin(self, ib: IB, isin: str) -> list[ContractDetails]:
@@ -78,54 +123,55 @@ class InstrumentResolver:
             details = []
         return list(details)
 
-    def _resolve_ticker(self, ib: IB, ticker: str) -> list[ContractDetails]:
+    def _resolve_ticker(self, ib: IB, ticker: str, overrides: ResolutionOverrides | None) -> list[ContractDetails]:
         candidates: list[ContractDetails] = []
-        if ticker.upper() in {"SPX", "VIX"}:
-            try:
-                candidates.extend(ib.reqContractDetails(Index(ticker, "CBOE")))
-            except Exception:
-                pass
-        try:
-            matches = ib.reqMatchingSymbols(ticker)
-            for match in matches:
-                contract = match.contract
-                details = ib.reqContractDetails(contract)
-                candidates.extend(details)
-        except Exception as exc:
-            self.logger.warning(
-                "run_id=%s matching symbols failed, fallback to heuristics: %s",
-                self.run_id,
-                exc,
-            )
-
-        if candidates:
-            return candidates
-
-        for sec_type in self.config.instruments.security_types:
-            contract = self._contract_for_type(ticker, sec_type)
+        for sec_type in self._ticker_sec_types(overrides):
+            contract = self._contract_for_type(ticker, sec_type, overrides)
             if contract is None:
                 continue
             details = ib.reqContractDetails(contract)
             candidates.extend(details)
-        return candidates
+        return self._dedupe_contracts(candidates)
+    def _ticker_sec_types(self, overrides: ResolutionOverrides | None) -> list[str]:
+        policy = ResolutionPolicy()
+        if overrides and overrides.sec_type:
+            return [overrides.sec_type.upper()]
+        configured = [SEC_TYPE_MAP.get(sec, sec).upper() for sec in self.config.instruments.security_types]
+        allowed = set(policy.allowed_ticker_sec_types)
+        filtered = [value for value in configured if value in allowed]
+        if not filtered:
+            filtered = list(policy.allowed_ticker_sec_types)
+        return filtered
 
-    def _contract_for_type(self, ticker: str, sec_type: str) -> Contract | None:
-        exchange = self.config.instruments.preferred_exchange or "SMART"
-        if sec_type == "stock" or sec_type == "etf":
-            return Stock(ticker, exchange, self.config.instruments.currency or "USD")
-        if sec_type == "index":
-            if ticker.upper() in {"SPX", "VIX"}:
-                return Index(ticker, "CBOE")
-            return Index(ticker, exchange)
-        if sec_type == "future":
+    def _contract_for_type(self, ticker: str, sec_type: str, overrides: ResolutionOverrides | None) -> Contract | None:
+        policy = ResolutionPolicy()
+        exchange = (overrides.exchange if overrides and overrides.exchange else self.config.instruments.preferred_exchange) or policy.default_exchange
+        currency = (overrides.currency if overrides and overrides.currency else self.config.instruments.currency) or policy.default_currency
+        sec_type = SEC_TYPE_MAP.get(sec_type, sec_type).upper()
+        if sec_type in {"STK", "ETF"}:
+            return Stock(ticker, exchange, currency)
+        if sec_type == "IND":
+            index_exchange = exchange
+            if ticker.upper() in {"SPX", "VIX"} and not (overrides and overrides.exchange):
+                index_exchange = "CBOE"
+            return Index(ticker, index_exchange)
+        if sec_type == "FUT":
             return Contract(symbol=ticker, secType="FUT", exchange=exchange)
-        if sec_type == "option":
+        if sec_type == "OPT":
             return Option(ticker, "", 0, "", exchange)
-        if sec_type == "bond":
+        if sec_type == "BOND":
             return Bond()
         return None
 
-    def _apply_hints(self, candidates: Iterable[ContractDetails]) -> list[ContractDetails]:
+    def _dedupe_contracts(self, candidates: list[ContractDetails]) -> list[ContractDetails]:
+        unique: dict[tuple[int, str, str, str], ContractDetails] = {}
+        for details in candidates:
+            contract = details.contract
+            key = (int(contract.conId or 0), contract.secType or "", contract.exchange or "", contract.localSymbol or "")
+            unique[key] = details
+        return list(unique.values())
+
+    def _apply_hints(self, candidates: Iterable[ContractDetails]) -> list[CandidateDecision]:
         filtered = list(candidates)
         allowed = {SEC_TYPE_MAP.get(sec, sec).upper() for sec in self.config.instruments.security_types}
         filtered = [c for c in filtered if c.contract.secType.upper() in allowed]
@@ -143,7 +189,104 @@ class InstrumentResolver:
         currency = self.config.instruments.currency
         if currency:
             filtered = [c for c in filtered if c.contract.currency == currency]
-        return filtered
+        return [CandidateDecision(details=value, keep=True, score=0, reasons=[]) for value in filtered]
+
+    def _select_ticker_candidates(
+        self,
+        ticker: str,
+        candidates: list[ContractDetails],
+        overrides: ResolutionOverrides | None,
+    ) -> list[CandidateDecision]:
+        policy = ResolutionPolicy()
+        ticker_key = ticker.upper()
+        known_defaults = dict(self.WELL_KNOWN_TICKERS.get(ticker_key, {}))
+        if overrides:
+            override_map = {
+                "sec_type": overrides.sec_type,
+                "exchange": overrides.exchange,
+                "currency": overrides.currency,
+                "primary_exchange": overrides.primary_exchange,
+            }
+            for key, value in override_map.items():
+                if value:
+                    known_defaults[key] = value.upper()
+
+        sec_types = {c.contract.secType.upper() for c in candidates if c.contract.secType}
+        has_index = "IND" in sec_types
+        decisions: list[CandidateDecision] = []
+        for details in candidates:
+            contract = details.contract
+            sec_type = (contract.secType or "").upper()
+            exchange = (contract.exchange or "").upper()
+            primary_exchange = (contract.primaryExchange or "").upper()
+            currency = (contract.currency or "").upper()
+            long_name = ((getattr(details, "longName", None) or "") + " " + (getattr(details, "marketName", None) or "")).upper()
+            reasons: list[str] = []
+            score = 0
+            keep = True
+
+            if sec_type == "BOND" and not (overrides and (overrides.sec_type or "").upper() == "BOND"):
+                keep = False
+                reasons.append("rejected: bond contracts require explicit --sec-type BOND")
+
+            if keep and sec_type not in policy.allowed_ticker_sec_types and sec_type != "BOND":
+                keep = False
+                reasons.append(f"rejected: secType {sec_type} not in default ticker universe")
+
+            if keep and "BOND" in long_name and not (overrides and (overrides.sec_type or "").upper() == "BOND"):
+                keep = False
+                reasons.append("rejected: bond-like issuer/description")
+
+            requested_sec_type = known_defaults.get("sec_type")
+            if keep and requested_sec_type:
+                if sec_type == requested_sec_type:
+                    score += 100
+                    reasons.append(f"preferred secType={requested_sec_type}")
+                else:
+                    keep = False
+                    reasons.append(f"rejected: secType mismatch expected {requested_sec_type}")
+
+            if keep and ticker_key in {"SPX", "VIX"} and has_index and sec_type != "IND":
+                keep = False
+                reasons.append("rejected: index contract preferred over stock-like match")
+
+            requested_currency = known_defaults.get("currency") or policy.default_currency
+            if keep:
+                if currency == requested_currency:
+                    score += 30
+                    reasons.append(f"preferred currency={requested_currency}")
+                elif known_defaults.get("currency"):
+                    keep = False
+                    reasons.append(f"rejected: currency mismatch expected {requested_currency}")
+
+            requested_exchange = known_defaults.get("exchange")
+            if keep and requested_exchange:
+                if exchange == requested_exchange or (requested_exchange == "SMART" and exchange == "SMART"):
+                    score += 20
+                    reasons.append(f"preferred exchange={requested_exchange}")
+
+            requested_primary_exchange = known_defaults.get("primary_exchange")
+            if keep and requested_primary_exchange:
+                if primary_exchange == requested_primary_exchange:
+                    score += 20
+                    reasons.append(f"preferred primaryExchange={requested_primary_exchange}")
+                elif sec_type in policy.stock_like_sec_types and primary_exchange:
+                    keep = False
+                    reasons.append(f"rejected: primaryExchange mismatch expected {requested_primary_exchange}")
+
+            if keep and sec_type in policy.stock_like_sec_types and not requested_primary_exchange:
+                if primary_exchange in policy.stock_like_primary_exchanges:
+                    score += 10
+                    reasons.append("preferred stock primary exchange")
+
+            if keep and sec_type in policy.index_sec_types and not requested_exchange:
+                if exchange in policy.index_exchanges:
+                    score += 10
+                    reasons.append("preferred index exchange")
+
+            decisions.append(CandidateDecision(details=details, keep=keep, score=score, reasons=reasons))
+        return decisions
+
 
     def _canonical_id(self, contract: Contract) -> str:
         symbol = normalize_filename(contract.symbol or "UNKNOWN")
@@ -169,22 +312,40 @@ class InstrumentResolver:
         identifier: str,
         identifier_type: str,
         candidates: list[ContractDetails],
-        selected: ContractDetails,
+        selected: ContractDetails | None,
         instrument_id: str,
+        decisions: list[CandidateDecision],
+        overrides: ResolutionOverrides | None,
     ) -> None:
         meta_dir = Path(self.config.output_dir) / instrument_id / "meta"
         meta_dir.mkdir(parents=True, exist_ok=True)
-        contract_payload = self._contract_payload(selected)
+        contract_payload = self._contract_payload(selected) if selected is not None else {}
+        applied_policy = self.WELL_KNOWN_TICKERS.get(identifier.upper(), {}) if identifier_type == "ticker" else {}
+        overrides_payload = {
+            "sec_type": overrides.sec_type if overrides else None,
+            "exchange": overrides.exchange if overrides else None,
+            "currency": overrides.currency if overrides else None,
+            "primary_exchange": overrides.primary_exchange if overrides else None,
+        }
+        rejected = [
+            {
+                **self._format_candidate(decision.details),
+                "reasons": decision.reasons,
+            }
+            for decision in decisions
+            if not decision.keep
+        ]
         resolution_payload = {
-            "identifier": identifier,
-            "identifier_type": identifier_type,
+            "input": {"identifier": identifier, "identifier_type": identifier_type},
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
             "candidate_count": len(candidates),
-            "selected_conId": selected.contract.conId,
-            "preferred_exchange": self.config.instruments.preferred_exchange,
-            "currency": self.config.instruments.currency,
-            "security_types": self.config.instruments.security_types,
-            "candidates": [self._format_candidate(c) for c in candidates],
+            "filters_applied": {
+                "policy": applied_policy,
+                "overrides": overrides_payload,
+                "default_security_types": self._ticker_sec_types(overrides),
+            },
+            "chosen_contract": self._format_candidate(selected) if selected is not None else None,
+            "rejected_candidates_top5": rejected[:5],
         }
         atomic_write(meta_dir / "contract_details.json", json.dumps(contract_payload, indent=2))
         atomic_write(meta_dir / "resolution.json", json.dumps(resolution_payload, indent=2))

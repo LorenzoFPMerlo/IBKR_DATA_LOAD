@@ -1,0 +1,21 @@
+{
+  "dataset_name": "option_contract_historical_bars",
+  "dataset_id": "5da2dcc424cebbc062a888c1a64c05fe8d956aebee75cab161fd77925e5f7b92",
+  "parameters_used": {
+    "barSize": "1 min",
+    "duration": "2 d",
+    "whatToShow": "trades",
+    "useRTH": 1,
+    "rights": "both",
+    "expirations_next": 1,
+    "strikes_nearest": 2,
+    "max_contracts": 20
+  },
+  "chunks_attempted": 48,
+  "chunks_succeeded": 36,
+  "chunks_failed": 0,
+  "rows_written": 18410,
+  "elapsed_seconds": 129.671,
+  "checkpoint_used": false,
+  "final_status": "succeeded"
+}
